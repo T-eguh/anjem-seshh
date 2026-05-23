@@ -79,12 +79,10 @@ export default function App() {
         : "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
     };
 
-    // Commit seed drivers to Firestore
-    try {
-      await bootstrapSeedDrivers();
-    } catch (e) {
-      console.error("Error seeding drivers:", e);
-    }
+    // Commit seed drivers to Firestore asynchronously without blocking login
+    bootstrapSeedDrivers().catch((e) => {
+      console.error("Error seeding drivers in background:", e);
+    });
 
     setUser(mockUser);
     setAuthLoading(false);
@@ -105,7 +103,7 @@ export default function App() {
       <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-4">
         <Bike className="h-10 w-10 text-indigo-500 animate-bounce mb-3" />
         <p className="text-sm font-bold tracking-wider font-mono uppercase">Menghubungkan ke Real-Time Database...</p>
-        <p className="text-xs text-slate-500 mt-1">Sistem Pelayanan Anjem Semarang</p>
+        <p className="text-xs text-slate-500 mt-1">Sistem Pelayanan ANJEM SESHH</p>
       </div>
     );
   }
@@ -135,8 +133,8 @@ export default function App() {
                   <Bike className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-slate-900 leading-tight">Masuk Portal Anjem</h3>
-                  <p className="text-[9px] text-slate-400 font-mono uppercase tracking-wider">Antar Jemput Semarang</p>
+                  <h3 className="font-extrabold text-slate-900 leading-tight">Daftar Jadi Driver / Masuk</h3>
+                  <p className="text-[9px] text-slate-400 font-mono uppercase tracking-wider">ANJEM SESHH SEMARANG</p>
                 </div>
               </div>
               <button 

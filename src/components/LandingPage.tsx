@@ -1,4 +1,4 @@
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useEffect } from "react";
 import { motion } from "motion/react";
 import { 
   MapPin, 
@@ -13,9 +13,15 @@ import {
   Users,
   Search,
   School,
-  ChevronRight
+  ChevronRight,
+  Sparkles,
+  Zap,
+  CheckCircle
 } from "lucide-react";
-import { SEMARANG_CAMPUSES, SemarangCampus } from "../data/mockData";
+import { SEMARANG_CAMPUSES } from "../data/mockData";
+import { db } from "../lib/firebase";
+import { collection, limit, onSnapshot, query } from "firebase/firestore";
+import { Shuttle } from "../types";
 
 interface LandingPageProps {
   onLoginClick: () => void;
@@ -26,11 +32,36 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
   const [pickup, setPickup] = useState("Tembalang");
   const [destination, setDestination] = useState("UNDIP");
   const [vehicle, setVehicle] = useState<"Motorcycle" | "Car">("Motorcycle");
-  const [isEstimaging, setIsEstimating] = useState(false);
+  const [isEstimating, setIsEstimating] = useState(false);
   const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null);
+  const [liveDrivers, setLiveDrivers] = useState<Shuttle[]>([]);
 
-  const pickupAreas = ["Tembalang", "Sekaran / Gunungpati", "Pleburan", "Kaligawe", "Ngaliyan", "Sampangan", "Banyumanik", "Kota Lama"];
+  const pickupAreas = [
+    "Tembalang", 
+    "Sekaran / Gunungpati", 
+    "Pleburan", 
+    "Kaligawe", 
+    "Ngaliyan", 
+    "Sampangan", 
+    "Banyumanik", 
+    "Kota Lama"
+  ];
   const campusTargets = ["UNDIP", "UNNES", "UDINUS", "UNISSULA", "UNIMUS", "UNIKA", "UIN Walisongo"];
+
+  // Fetch real-time driver overview for display on Landing Page
+  useEffect(() => {
+    const q = query(collection(db, "shuttles"), limit(4));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: Shuttle[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push(docSnap.data() as Shuttle);
+      });
+      setLiveDrivers(list);
+    }, (error) => {
+      console.warn("Could not load preview list of drivers: ", error);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleEstimate = (e: FormEvent) => {
     e.preventDefault();
@@ -38,101 +69,114 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
     setEstimatedPrice(null);
 
     setTimeout(() => {
-      // Elegant simple Semarang-themed price calculations
       let base = vehicle === "Motorcycle" ? 8000 : 18000;
       
-      // Add distance cost factors based on typical Semarang topology
-      if (pickup.includes("Tembalang") && destination === "UNDIP") base += 2000;
-      else if (pickup.includes("Sekaran") && destination === "UNNES") base += 1000;
-      else if (pickup.includes("Pleburan") && destination === "UDINUS") base += 3000;
-      else {
-        // Cross city Semarang (e.g. Tembalang to UNNES is hilly and far!)
-        base += 12000;
+      // Semarang specific geography cost computation
+      if (pickup === "Tembalang" && destination === "UNDIP") base += 2000;
+      else if (pickup.includes("Sekaran") && destination === "UNNES") base += 1500;
+      else if (pickup === "Pleburan" && destination === "UDINUS") base += 2000;
+      else if ((pickup === "Tembalang" && destination === "UNNES") || (pickup.includes("Sekaran") && destination === "UNDIP")) {
+        // High distance over Semarang steep terrain!
+        base += 15000;
+      } else {
+        base += 9000;
       }
 
       setEstimatedPrice(base);
       setIsEstimating(false);
-    }, 1500); // Realistic calculation duration
+    }, 1200);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans" id="landing-container">
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans relative overflow-hidden" id="landing-container">
+      {/* Decorative premium background patterns for Anjem theme */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none" id="mesh-grid"></div>
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-indigo-200/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-1/3 right-1/4 w-[400px] h-[400px] bg-rose-200/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      {/* Premium Notification Toast Header */}
+      <div className="relative z-10 bg-indigo-650 text-white text-center py-2.5 px-4 text-xs font-semibold tracking-wide flex items-center justify-center gap-1.5" id="top-announcement">
+        <Sparkles className="h-3.5 w-3.5 text-yellow-300 fill-yellow-300 animate-pulse" />
+        <span>Pemesanan Terintegrasi Real-Time Cloud Firestore &amp; Siap Live Untuk Mahasiswa</span>
+      </div>
+
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 backdrop-blur-md bg-white/90 border-b border-slate-200 px-4 py-3 mr-auto ml-auto max-w-7xl font-sans" id="landing-navbar">
-        <div className="flex items-center justify-between mx-auto" id="nav-inner">
+      <nav className="sticky top-0 z-50 backdrop-blur-md bg-white/80 border-b border-slate-200/65 px-4 py-4" id="landing-navbar">
+        <div className="max-w-7xl mx-auto flex items-center justify-between" id="nav-inner">
           <div className="flex items-center space-x-3" id="nav-logo">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-bold text-white text-xl shadow-lg shadow-indigo-600/20">
-              <Bike className="h-5 w-5 text-white" />
+            <div className="w-10 h-10 bg-indigo-650 rounded-xl flex items-center justify-center font-bold text-white text-xl shadow-md shadow-indigo-600/30">
+              <Bike className="h-5.5 w-5.5 text-white" />
             </div>
             <div>
-              <span className="font-extrabold text-xl tracking-tight text-slate-900">ANJEM<span className="text-indigo-600">.SRG</span></span>
-              <span className="block text-[9px] text-slate-500 font-mono tracking-wider uppercase">Sistem Antar Jemput Mahasiswa</span>
+              <span className="font-extrabold text-xl tracking-tight text-slate-900">ANJEM<span className="text-indigo-650"> SESHH</span></span>
+              <span className="block text-[9px] text-slate-400 font-mono tracking-wider uppercase font-bold">Portal Antar Jemput Mahasiswa Semarang</span>
             </div>
           </div>
 
-          <div className="hidden md:flex items-center space-x-6" id="nav-links">
-            <a href="#features" className="text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-indigo-600 transition">Fitur Utama</a>
-            <a href="#campuses" className="text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-indigo-600 transition">Kampus Terdaftar</a>
-            <a href="#calculator" className="text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-indigo-600 transition">Estimasi Tarif</a>
-            <a href="#testimonials" className="text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-indigo-600 transition">Ulasan</a>
+          <div className="hidden md:flex items-center space-x-8" id="nav-links">
+            <a href="#features" className="text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-indigo-600 transition">Fitur Unggul</a>
+            <a href="#campuses" className="text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-indigo-600 transition">Wilayah Kampus</a>
+            <a href="#drivers-preview" className="text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-indigo-600 transition">Driver Aktif</a>
+            <a href="#calculator" className="text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-indigo-600 transition">Tarif Transparan</a>
           </div>
 
           <div id="nav-cta">
             <button
               onClick={onLoginClick}
-              className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider transition-all duration-200 shadow-sm shadow-indigo-600/20 cursor-pointer flex items-center space-x-1.5"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-550 text-slate-950 hover:from-amber-400 hover:to-orange-455 text-xs font-black uppercase tracking-wider transition-all duration-300 shadow-[0_0_15px_rgba(245,158,11,0.5)] hover:shadow-[0_0_22px_rgba(241,92,12,0.7)] border border-white/50 hover:scale-[1.04] cursor-pointer flex items-center space-x-1.5"
               id="btn-nav-login"
             >
-              <span>Portal Masuk</span>
-              <ArrowRight className="h-3.5 w-3.5" />
+              <span>Daftar Jadi Driver</span>
+              <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="relative px-4 py-16 md:py-24 max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-12" id="hero-section">
-        <div className="flex-1 space-y-6" id="hero-content">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold" id="badge-hero">
-            <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></div>
-            <span className="uppercase tracking-wider text-[10px]">Layanan Mahasiswa Semarang</span>
+      <section className="relative px-4 py-16 md:py-24 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center" id="hero-section">
+        <div className="lg:col-span-7 space-y-8" id="hero-content">
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold" id="badge-hero">
+            <div className="w-2 h-2 rounded-full bg-indigo-600 animate-ping"></div>
+            <span className="uppercase tracking-widest text-[9px]">Layanan Khusus Semarang</span>
           </div>
 
-          <h1 className="text-4xl md:text-5xl lg:text-5xl font-extrabold text-slate-950 tracking-tight leading-tight" id="hero-title">
-            Solusi <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-indigo-800">Antar Jemput</span> Mahasiswa Terpercaya & Real-Time.
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-950 tracking-tight leading-tight" id="hero-title">
+            Mobilitas Kampus <span className="text-indigo-650">Lebih Cepat</span>, Aman &amp; Hemat.
           </h1>
           
-          <p className="text-sm text-slate-500 leading-relaxed max-w-xl" id="hero-desc">
-            Mobilitas kampus yang aman, hemat, dan praktis. Dirancang khusus untuk mahasiswa kota Semarang. Dapatkan antar-jemput langsung ke depan gerbang fakultasmu!
+          <p className="text-sm md:text-base text-slate-500 leading-relaxed max-w-2xl" id="hero-desc">
+            Hindari telat kelas pagi di Semarang! <strong>ANJEM SESHH</strong> menghubungkan langsung mahasiswa dengan driver terdekat secara real-time. Pesan instan, pantau status, dan langsung pergi ke fakultas impianmu tanpa ribet macet &amp; cari parkir.
           </p>
 
-          {/* Core Stats */}
-          <div className="grid grid-cols-3 gap-4 border-y border-slate-200 py-4" id="hero-stats">
+          {/* Key Trust Badges */}
+          <div className="grid grid-cols-3 gap-6 max-w-xl bg-white/60 backdrop-blur-md p-4 border border-slate-205 rounded-2xl" id="hero-stats">
             <div>
-              <span className="block text-2xl font-black text-slate-900">10k+</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Total perjalanan</span>
+              <span className="block text-2xl md:text-3xl font-black text-slate-900 font-mono">10k+</span>
+              <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block mt-0.5">Trips Selesai</span>
             </div>
             <div>
-              <span className="block text-2xl font-black text-slate-900">45+</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Driver aktif</span>
+              <span className="block text-2xl md:text-3xl font-black text-slate-900 font-mono">45+</span>
+              <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block mt-0.5">Driver Aktif</span>
             </div>
             <div>
-              <span className="block text-2xl font-black text-slate-900">4.9</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 flex items-center">Rating mhs <Star className="h-3 w-3 text-amber-500 ml-1 fill-amber-500" /></span>
+              <span className="block text-2xl md:text-3xl font-black text-indigo-600 flex items-center font-mono">4.9 <Star className="h-5 w-5 text-amber-500 ml-1.5 fill-amber-500" /></span>
+              <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block mt-0.5">Kepuasan Mhs</span>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-3 pt-2" id="hero-ctas">
+          <div className="flex flex-col sm:flex-row items-center gap-4" id="hero-ctas">
             <button
               onClick={onLoginClick}
-              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-wider transition duration-200 shadow-md shadow-indigo-600/20 cursor-pointer text-center"
+              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-indigo-650 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-widest transition duration-300 shadow-lg shadow-indigo-650/20 cursor-pointer text-center flex items-center justify-center space-x-2"
               id="cta-book"
             >
-              Order Anjem Sekarang
+              <span>Mulai Cari Driver</span>
+              <Zap className="h-4 w-4" />
             </button>
             <a
               href="#calculator"
-              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs uppercase tracking-wider border border-slate-200 transition text-center cursor-pointer"
+              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white hover:bg-slate-100 text-slate-705 font-bold text-xs uppercase tracking-widest border border-slate-200 transition text-center cursor-pointer block shadow-sm"
               id="cta-estimate"
             >
               Cek Estimasi Tarif
@@ -141,151 +185,164 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
         </div>
 
         {/* Hero Interactive UI Card with High Density look */}
-        <div className="flex-1 w-full max-w-md mx-auto" id="hero-visual">
+        <div className="lg:col-span-5 w-full max-w-md mx-auto relative z-10" id="hero-visual">
           <motion.div 
-            initial={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 relative overflow-hidden"
+            transition={{ duration: 0.6 }}
+            className="rounded-3xl p-6 shadow-2xl border border-teal-200/80 relative overflow-hidden bg-cover bg-center text-slate-900"
+            style={{ 
+              backgroundImage: "linear-gradient(to bottom, rgba(255, 248, 240, 0.25), rgba(255, 255, 255, 0.45)), url('https://images.unsplash.com/photo-1519750157634-b6d493a0f77c?w=600&auto=format&fit=crop&q=100')" 
+            }}
             id="interactive-concept-card"
           >
-            {/* Visual Header */}
-            <div className="flex items-center justify-between mb-5 border-b border-slate-100 pb-3" id="vis-card-header">
+            {/* Visual Glass Header */}
+            <div className="flex items-center justify-between mb-6 border-b border-white/50 pb-4 bg-white/70 backdrop-blur-sm p-3 rounded-2xl shadow-sm">
               <div className="flex items-center space-x-3">
-                <div className="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs">
-                  AM
+                <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-white font-black text-xs font-mono shadow-md animate-bounce">
+                  VESPA
                 </div>
                 <div>
-                  <h4 className="font-bold text-slate-900 text-xs">Anjem Semarang</h4>
-                  <p className="text-[10px] text-slate-400">Tembalang Raya</p>
+                  <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider">Layanan Premium</h4>
+                  <p className="text-[10px] text-amber-600 font-bold font-mono">EDISI VESPA SEMARANG</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-green-50 rounded-full border border-green-200">
-                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping"></div>
-                <span className="text-[10px] font-bold text-green-700 uppercase tracking-wider">
-                  SYSTEM ACTIVE
-                </span>
+              <div className="px-3 py-1 bg-emerald-500 text-white rounded-full flex items-center space-x-1 shadow-md">
+                <span className="w-2 h-2 rounded-full bg-white animate-ping"></span>
+                <span className="text-[9px] font-extrabold uppercase tracking-widest font-mono">ONLINE</span>
               </div>
             </div>
 
-            {/* Quick Map Line */}
-            <div className="space-y-4 relative" id="vis-card-path">
-              {/* Vertical line connector */}
-              <div className="absolute left-[13px] top-[24px] bottom-[24px] w-0.5 border-l-2 border-dashed border-slate-200"></div>
+            {/* Quick Map Line with solid white high-contrast backing */}
+            <div className="space-y-4 relative px-1 bg-white/90 backdrop-blur-md border border-slate-200/90 rounded-2xl p-4 shadow-lg text-slate-800" id="vis-card-path">
+              <div className="absolute left-[29px] top-[40px] bottom-[40px] w-0.5 border-l-2 border-dashed border-indigo-400"></div>
 
               <div className="flex items-start space-x-3 relative z-10" id="path-pickup">
-                <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white ring-4 ring-indigo-50 text-xs font-black">
-                  P
+                <div className="w-8 h-8 rounded-xl bg-amber-500 flex items-center justify-center text-white font-black text-xs shadow-md">
+                  <MapPin className="h-4 w-4" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-[9px] text-slate-400 uppercase font-extrabold tracking-wider">Titik Penjemputan</p>
-                  <p className="text-xs font-bold text-slate-800">Kos Tembalang Barat, Semarang</p>
+                  <p className="text-[8px] text-amber-600 uppercase font-black tracking-wider font-mono">Penjemputan Anda</p>
+                  <p className="text-xs font-black text-slate-900">Kost Tembalang Raya, Semarang</p>
+                  <p className="text-[10px] text-slate-500">Area sekitar Kampus UNDIP</p>
                 </div>
               </div>
 
               <div className="flex items-start space-x-3 relative z-10" id="path-dropoff">
-                <div className="w-7 h-7 rounded-lg bg-indigo-900 flex items-center justify-center text-white ring-4 ring-slate-100 text-xs font-black">
-                  D
+                <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black text-xs shadow-md">
+                  <School className="h-4 w-4" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-[9px] text-slate-400 uppercase font-extrabold tracking-wider">Universitas Tujuan</p>
-                  <p className="text-xs font-bold text-slate-800">Dekanat Fakultas Teknik UNDIP</p>
+                  <p className="text-[8px] text-indigo-600 uppercase font-black tracking-wider font-mono">Tujuan Fakultas</p>
+                  <p className="text-xs font-black text-slate-900">Dekanat Fakultas Kedokteran UNDIP</p>
+                  <p className="text-[10px] text-slate-500">Gedung Utama, Tembalang</p>
                 </div>
               </div>
             </div>
 
-            {/* Estimated time mockup */}
-            <div className="mt-5 p-3 rounded-xl bg-slate-50 border border-slate-100 flex justify-between items-center" id="vis-card-meta">
-              <div className="flex items-center space-x-2">
-                <Clock className="h-3.5 w-3.5 text-indigo-600 animate-pulse" />
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Jadwal Keberangkatan</span>
+            {/* Simulated Live Match with bold contrasted theme */}
+            <div className="mt-4 p-4 rounded-2xl bg-slate-900 text-white flex justify-between items-center relative overflow-hidden shadow-xl" id="vis-card-meta">
+              <div>
+                <span className="text-[8px] text-yellow-405 font-bold uppercase tracking-wider font-mono flex items-center gap-1">
+                  <Sparkles className="h-3 w-3 text-yellow-300 animate-spin" /> Driver Vespa Rekomendasi
+                </span>
+                <p className="text-xs font-bold text-white mt-0.5">Aris Tembalang &bull; Vespa Sprint Kuning</p>
+                <div className="flex items-center space-x-1.5 mt-1">
+                  <Star className="h-3.5 w-3.5 text-yellow-405 fill-yellow-405" style={{ color: "#fbbf24", fill: "#fbbf24" }} />
+                  <span className="text-[10px] font-bold text-slate-300">4.9 (184 trips)</span>
+                </div>
               </div>
-              <span className="text-[10px] font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                Pagi ini 07:15 WIB
-              </span>
+              <div className="text-right">
+                <span className="text-[9px] text-slate-400 block font-mono">Mulai Dari</span>
+                <span className="text-sm font-black text-yellow-400 font-mono block">Rp 10.000</span>
+              </div>
             </div>
 
+            {/* Super Prominent Bright Glowing Register Now CTA Button */}
             <button 
               onClick={onLoginClick}
-              className="mt-4 w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-sm flex items-center justify-center space-x-2 cursor-pointer"
+              className="mt-5 w-full py-4.5 bg-gradient-to-r from-yellow-500 via-amber-500 to-orange-500 hover:scale-[1.03] text-slate-950 font-black text-xs uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center space-x-2 shadow-2xl shadow-amber-500/35 border-2 border-white hover:border-yellow-250 animate-pulse"
             >
-              <span>Eksplor Driver Semarang</span>
-              <ChevronRight className="h-3.5 w-3.5" />
+              <Zap className="h-4.5 w-4.5 text-white fill-white animate-bounce" />
+              <span className="text-slate-950 font-black">DAFTAR DRIVER SEKARANG JUGA &rarr;</span>
             </button>
           </motion.div>
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section className="bg-white py-16 px-4 border-y border-slate-200" id="features">
-        <div className="max-w-7xl mx-auto space-y-12">
-          <div className="text-center max-w-xl mx-auto space-y-2" id="features-header">
-            <h2 className="text-3xl font-extrabold text-slate-950 tracking-tight">Pelayanan Anjem Terbaik</h2>
-            <p className="text-sm text-slate-500">Kemudahan transportasi roda dua dan empat dengan jaminan keamanan dan harga ramah kantong mahasiswa Semarang.</p>
+      {/* High-Fidelity Features Section */}
+      <section className="bg-white py-20 px-4 border-y border-slate-200/80" id="features">
+        <div className="max-w-7xl mx-auto space-y-16">
+          <div className="text-center max-w-2xl mx-auto space-y-4" id="features-header">
+            <h2 className="text-3xl font-extrabold text-slate-950 tracking-tight">Kelebihan Utama ANJEM SESHH</h2>
+            <p className="text-sm md:text-base text-slate-500">Dirancang khusus untuk menyesuaikan kebutuhan finansial dan waktu mahasiswa Semarang.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6" id="features-grid">
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/60 hover:border-indigo-300 hover:bg-white transition duration-250" id="feat-1">
-              <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4">
-                <Clock className="h-5 w-5" />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8" id="features-grid">
+            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200/60 hover:border-indigo-300 hover:bg-white transition duration-300 shadow-sm" id="feat-1">
+              <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-6">
+                <Clock className="h-6 w-6" />
               </div>
-              <h3 className="font-bold text-base text-slate-900">Real-Time Database</h3>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">Setiap booking tercatat real-time. Status langsung sinkron begitu driver menerima orderan.</p>
+              <h3 className="font-extrabold text-base text-slate-900">Keberangkatan Instant</h3>
+              <p className="text-xs text-slate-500 mt-3 leading-relaxed">Pesan langsung saat di kos, driver siap siaga di area sekitar kampus untuk memangkas waktu nunggu Anda.</p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/60 hover:border-indigo-300 hover:bg-white transition duration-250" id="feat-2">
-              <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4">
-                <ShieldCheck className="h-5 w-5" />
+            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200/60 hover:border-indigo-300 hover:bg-white transition duration-300 shadow-sm" id="feat-2">
+              <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-6">
+                <ShieldCheck className="h-6 w-6" />
               </div>
-              <h3 className="font-bold text-base text-slate-900">100% Khusus Universitas</h3>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">Mencakup UNDIP, UNNES, UDINUS, UNISSULA dan lainnya. Driver hafal rute jalan pintas kampus.</p>
+              <h3 className="font-extrabold text-base text-slate-900">Aman &amp; Tepercaya</h3>
+              <p className="text-xs text-slate-500 mt-3 leading-relaxed">Seluruh profil driver kami diverifikasi dengan kelengkapan SIM, STNK, dan identitas kampus Semarang.</p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/60 hover:border-indigo-300 hover:bg-white transition duration-250" id="feat-3">
-              <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4">
-                <DollarSign className="h-5 w-5" />
+            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200/60 hover:border-indigo-300 hover:bg-white transition duration-300 shadow-sm" id="feat-3">
+              <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-6">
+                <DollarSign className="h-6 w-6" />
               </div>
-              <h3 className="font-bold text-base text-slate-900">Biaya Paten Transparan</h3>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">Estimasi harga adil sejak awal. Tanpa biaya tersembunyi, dapat dinegosiasikan langsung dengan driver.</p>
+              <h3 className="font-extrabold text-base text-slate-900">Tarif Kantong Mahasiswa</h3>
+              <p className="text-xs text-slate-500 mt-3 leading-relaxed">Tarif trasparan dari awal tanpa ada biaya siluman. Sangat pas dengan ketersediaan bulanan mahasiswa.</p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/60 hover:border-indigo-300 hover:bg-white transition duration-250" id="feat-4">
-              <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4">
-                <Users className="h-5 w-5" />
+            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200/60 hover:border-indigo-300 hover:bg-white transition duration-300 shadow-sm" id="feat-4">
+              <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-6">
+                <Users className="h-6 w-6" />
               </div>
-              <h3 className="font-bold text-base text-slate-900">Teman Sesama Mahasiswa</h3>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">Sebagian besar driver kami juga merupakan mahasiswa Semarang, membuat obrolan di jalan terasa asik.</p>
+              <h3 className="font-extrabold text-base text-slate-900">Teman Sekampus</h3>
+              <p className="text-xs text-slate-500 mt-3 leading-relaxed">Driver mayoritas mahasiswa aktif di Semarang. Perbanyak obrolan seru dan link jejaring sosial.</p>
             </div>
           </div>
         </div>
       </section>
 
       {/* University Coverage Section */}
-      <section className="py-16 px-4 max-w-7xl mx-auto space-y-10" id="campuses">
-        <div className="text-center max-w-2xl mx-auto space-y-2">
-          <h2 className="text-3xl font-extrabold text-slate-950 tracking-tight">Wilayah Kampus Terlayani</h2>
-          <p className="text-sm text-slate-500">Layanan kami menjangkau seluruh universitas besar di daerah Semarang dan sekitarnya.</p>
+      <section className="py-20 px-4 max-w-7xl mx-auto space-y-12" id="campuses">
+        <div className="text-center max-w-2xl mx-auto space-y-4">
+          <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest font-mono">Dukungan Wilayah</span>
+          <h2 className="text-3xl font-extrabold text-slate-950 tracking-tight">Wilayah Jangkauan Semarang</h2>
+          <p className="text-sm text-slate-500">Mencakupi seluruh fakultas dan asrama di kampus-kampus utama kota Semarang.</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="campus-grid">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6" id="campus-grid">
           {SEMARANG_CAMPUSES.map((campus) => (
             <div 
               key={campus.id} 
-              className="bg-white rounded-xl p-4 border border-slate-200 hover:border-indigo-300 hover:shadow-sm transition"
+              className="bg-white rounded-2xl p-5 border border-slate-200 hover:border-indigo-300 hover:shadow-md transition duration-300 flex flex-col justify-between"
               id={`campus-card-${campus.id}`}
             >
-              <div className="flex items-center justify-between mb-2">
-                <div className="p-2 bg-slate-100 text-slate-700 rounded-lg">
-                  <School className="h-4 w-4" />
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-slate-100 text-slate-700 rounded-xl">
+                    <School className="h-5 w-5 text-indigo-600" />
+                  </div>
+                  <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full border border-indigo-100 uppercase">
+                    {campus.availableDrivers} Driver
+                  </span>
                 </div>
-                <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full border border-indigo-100 uppercase">
-                  {campus.availableDrivers} Driver
-                </span>
+                <h3 className="font-extrabold text-base text-slate-900">{campus.name}</h3>
+                <p className="text-xs text-slate-400 font-semibold mt-1">{campus.fullName}</p>
               </div>
-              <h3 className="font-bold text-sm text-slate-900">{campus.name}</h3>
-              <p className="text-[11px] text-slate-400 font-medium mb-1.5">{campus.fullName}</p>
-              <div className="flex items-center space-x-1 text-[11px] text-slate-500 border-t border-slate-100 pt-2 mt-2">
-                <MapPin className="h-3 w-3 text-slate-400" />
+              <div className="flex items-center space-x-2 text-xs text-slate-500 border-t border-slate-100 pt-4 mt-6">
+                <MapPin className="h-4 w-4 text-slate-405 text-indigo-600" />
                 <span>Sekitar {campus.mainArea}</span>
               </div>
             </div>
@@ -293,103 +350,149 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
         </div>
       </section>
 
+      {/* Elegant Live Driver Preview Deck */}
+      <section className="bg-slate-100/60 py-20 px-4 border-t border-slate-200" id="drivers-preview">
+        <div className="max-w-7xl mx-auto space-y-12">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <span className="px-3 py-1 text-[9px] font-bold bg-green-50 text-green-700 border border-green-200 uppercase tracking-widest font-mono rounded-full">LIVE PREVIEW</span>
+            <h2 className="text-3xl font-extrabold text-slate-950 tracking-tight">Daftar Driver yang Sedang Online</h2>
+            <p className="text-sm text-slate-500">Berikut beberapa driver Semarang yang online di database real-time saat ini.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {liveDrivers.length > 0 ? (
+              liveDrivers.map((driver) => (
+                <div key={driver.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between space-y-4">
+                  <div>
+                    <div className="flex items-center space-x-3 mb-4">
+                      <img src={driver.driverPhoto} alt={driver.driverName} className="w-10 h-10 rounded-full border object-cover" />
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-xs leading-none">{driver.driverName}</h4>
+                        <span className="text-[9px] text-slate-400 font-mono mt-1 block uppercase font-bold">{driver.plateNumber}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5 text-xs text-slate-500">
+                      <p className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-indigo-600 flex-shrink-0" /> <span className="line-clamp-1">{driver.coverageAreas.join(", ")}</span></p>
+                      <p className="flex items-center gap-1.5"><School className="h-3.5 w-3.5 text-indigo-600 flex-shrink-0" /> <span className="line-clamp-1">{driver.targetCampuses.join(", ")}</span></p>
+                    </div>
+                  </div>
+                  <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
+                    <div>
+                      <span className="text-[8px] text-slate-400 block font-mono font-bold uppercase">Tarif Mulai</span>
+                      <span className="text-sm font-black text-indigo-600 font-mono">Rp {driver.basePrice.toLocaleString("id")}</span>
+                    </div>
+                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded ${driver.status === 'Available' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700'}`}>
+                      {driver.status === "Available" ? "SIAP" : "SIBUK"}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full py-8 text-center text-slate-400 text-xs">
+                Sedang memuat data driver real-time dari Firebase...
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
       {/* Interactive Tariff Estimator Calculator */}
-      <section className="bg-slate-900 text-white py-16 px-4" id="calculator">
-        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
-          <div className="md:col-span-5 space-y-4" id="calc-intro">
-            <span className="text-xs font-semibold text-indigo-400 uppercase tracking-widest font-mono">Cek Tarif Sewa</span>
-            <h2 className="text-3xl font-extrabold tracking-tight">Kalkulator Estimasi Tarif</h2>
-            <p className="text-[13px] text-slate-300 leading-relaxed">
-              Bandingkan biaya anjem motor ataupun mobil dengan mudah. Masukkan perkiraan titik kumpul dan kampus tujuanmu di Semarang untuk memulai simulasi harga.
+      <section className="bg-slate-900 text-white py-20 px-4" id="calculator">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          <div className="lg:col-span-5 space-y-6" id="calc-intro">
+            <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest font-mono">Simulasi Biaya Transparan</span>
+            <h2 className="text-4xl font-extrabold tracking-tight">Kalkulator Estimasi Biaya Perjalanan</h2>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              Dapatkan kepastian tarif sewa sebelum memesan. Gunakan kalkulator interaktif kami untuk mengestimasi biaya pengantaran dari wilayah kos Anda ke lokasi dekanat kampus di Kota Semarang.
             </p>
-            <div className="space-y-2 mt-4">
+            <div className="space-y-3 pt-2">
               <div className="flex items-center space-x-2 text-xs text-slate-400">
-                <CheckCircle2 className="h-3.5 w-3.5 text-indigo-400" />
-                <span>Sesuai standar kantong mahasiswa kos</span>
+                <CheckCircle className="h-4 w-4 text-indigo-400 flex-shrink-0" />
+                <span>Perhitungan adil berdasarkan rute Semarang</span>
               </div>
               <div className="flex items-center space-x-2 text-xs text-slate-400">
-                <CheckCircle2 className="h-3.5 w-3.5 text-indigo-400" />
-                <span>Meliputi rute tanjakan ekstrem (Sigar Bencah / UNNES)</span>
+                <CheckCircle className="h-4 w-4 text-indigo-400 flex-shrink-0" />
+                <span>Pilihan armada roda dua (Sangat Gesit) atau roda empat</span>
               </div>
             </div>
           </div>
 
-          <div className="md:col-span-7" id="calc-form-container">
-            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/15 text-slate-900">
-              <form onSubmit={handleEstimate} className="space-y-4">
+          <div className="lg:col-span-7" id="calc-form-container">
+            <div className="bg-white/5 backdrop-blur-md rounded-3xl p-6 md:p-8 border border-white/10 text-slate-900">
+              <form onSubmit={handleEstimate} className="space-y-5">
                 <div>
-                  <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-300 mb-1">Pilih Daerah Penjemputan</label>
+                  <label className="block text-[10px] uppercase font-bold tracking-widest text-slate-300 mb-1.5 font-mono">Pilih Wilayah Penjemputan</label>
                   <select 
                     value={pickup} 
                     onChange={(e) => setPickup(e.target.value)}
-                    className="w-full bg-slate-800 text-white border border-slate-700 rounded-lg p-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full bg-slate-850 text-white border border-slate-755 rounded-xl p-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   >
                     {pickupAreas.map((area) => (
-                      <option className="bg-slate-900" key={area} value={area}>{area}</option>
+                      <option className="bg-slate-950" key={area} value={area}>{area}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-300 mb-1">Universitas Tujuan</label>
+                  <label className="block text-[10px] uppercase font-bold tracking-widest text-slate-300 mb-1.5 font-mono">Universitas Tujuan</label>
                   <select 
                     value={destination} 
                     onChange={(e) => setDestination(e.target.value)}
-                    className="w-full bg-slate-800 text-white border border-slate-700 rounded-lg p-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full bg-slate-850 text-white border border-slate-755 rounded-xl p-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   >
                     {campusTargets.map((c) => (
-                      <option className="bg-slate-900" key={c} value={c}>{c}</option>
+                      <option className="bg-slate-950" key={c} value={c}>{c}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-300 mb-2">Jenis Armada Kendaraan</label>
+                  <label className="block text-[10px] uppercase font-bold tracking-widest text-slate-300 mb-2 font-mono">Pilih Jenis Armada</label>
                   <div className="grid grid-cols-2 gap-4">
                     <button
                       type="button"
                       onClick={() => setVehicle("Motorcycle")}
-                      className={`py-2 rounded-lg border text-xs font-bold transition duration-150 uppercase tracking-wider flex items-center justify-center space-x-2 cursor-pointer ${
+                      className={`py-3 rounded-xl border text-xs font-bold transition duration-200 uppercase tracking-widest flex items-center justify-center space-x-2 cursor-pointer ${
                         vehicle === "Motorcycle" 
-                        ? "bg-indigo-600 border-indigo-600 text-white shadow-sm" 
-                        : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750"
+                        ? "bg-indigo-650 border-indigo-500 text-white shadow-md shadow-indigo-650/10" 
+                        : "bg-slate-850 border-slate-755 text-slate-300 hover:bg-slate-800"
                       }`}
                     >
-                      <Bike className="h-3.5 w-3.5" />
-                      <span>Motor</span>
+                      <Bike className="h-4 w-4" />
+                      <span>Armada Motor</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setVehicle("Car")}
-                      className={`py-2 rounded-lg border text-xs font-bold transition duration-150 uppercase tracking-wider flex items-center justify-center space-x-2 cursor-pointer ${
+                      className={`py-3 rounded-xl border text-xs font-bold transition duration-200 uppercase tracking-widest flex items-center justify-center space-x-2 cursor-pointer ${
                         vehicle === "Car" 
-                        ? "bg-indigo-600 border-indigo-600 text-white shadow-sm" 
-                        : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-755"
+                        ? "bg-indigo-650 border-indigo-500 text-white shadow-md shadow-indigo-650/10" 
+                        : "bg-slate-850 border-slate-755 text-slate-300 hover:bg-slate-800"
                       }`}
                     >
-                      <Car className="h-3.5 w-3.5" />
-                      <span>Mobil</span>
+                      <Car className="h-4 w-4" />
+                      <span>Armada Mobil</span>
                     </button>
                   </div>
                 </div>
 
                 <button
                   type="submit"
-                  disabled={isEstimaging}
-                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 text-white rounded-lg font-bold text-xs uppercase tracking-widest cursor-pointer mt-2 transition"
+                  disabled={isEstimating}
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-550 disabled:bg-indigo-805 text-white rounded-xl font-bold text-xs uppercase tracking-widest cursor-pointer mt-4 transition duration-300"
                 >
-                  {isEstimaging ? "Menghitung rute terbaik..." : "Hitung Estimasi Biaya"}
+                  {isEstimating ? "Menghitung Estimasi Tarif..." : "Kalkulasikan Biaya"}
                 </button>
               </form>
 
               {estimatedPrice !== null && (
-                <div className="mt-5 p-4 rounded-xl bg-slate-950 border border-slate-800 text-center animate-fade-in text-white">
-                  <span className="block text-[10px] uppercase tracking-widest text-slate-400 mb-1 font-mono">Estimasi Tarif Perjalanan</span>
-                  <p className="text-2xl font-black text-indigo-400 font-mono">
+                <div className="mt-6 p-5 rounded-2xl bg-slate-950 border border-slate-850 text-center animate-fade-in text-white">
+                  <span className="block text-[10px] uppercase tracking-widest text-slate-500 mb-1 font-mono font-bold">Hasil Perhitungan Biaya</span>
+                  <p className="text-3xl font-black text-indigo-400 font-mono">
                     Rp {estimatedPrice.toLocaleString("id-ID")}
                   </p>
-                  <span className="block text-[9px] text-slate-500 mt-1">
-                    *Harga bervariasi bergantung kondisi cuaca dan ketersediaan driver.
+                  <span className="block text-[9px] text-slate-500 mt-2">
+                    *Harga pas standar kemahasiswaan. Negosiasi lanjutan bisa langsung dibicarakan dengan driver.
                   </span>
                 </div>
               )}
@@ -398,72 +501,21 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="bg-white py-16 px-4" id="testimonials">
-        <div className="max-w-5xl mx-auto space-y-12">
-          <div className="text-center max-w-xl mx-auto space-y-2">
-            <h2 className="text-3xl font-extrabold text-slate-950 tracking-tight">Kesan Pengguna Semarang</h2>
-            <p className="text-sm text-slate-500">Testimoni nyata dari mahasiswa pengguna setia jasa antar jemput kami sehari-hari.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6" id="testimonial-grid">
-            <div className="p-5 rounded-xl bg-slate-50 border border-slate-200/70 flex flex-col justify-between space-y-5" id="testi-1">
-              <p className="text-slate-600 text-xs leading-relaxed italic">
-                "Setiap ada kelas pagi jam 7 di UNDIP Tembalang, saya selalu pesan Anjem Semarang. Ga usah repot macet di tanjakan dan cari parkiran motor yang penuh."
-              </p>
-              <div className="flex items-center space-x-3">
-                <div className="font-bold text-xs bg-indigo-100 text-indigo-800 w-8 h-8 rounded-full flex items-center justify-center">DF</div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">Dimas Febri</h4>
-                  <p className="text-[10px] text-slate-400">Teknik Informatika - UNDIP</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-5 rounded-xl bg-slate-50 border border-slate-200/70 flex flex-col justify-between space-y-5" id="testi-2">
-              <p className="text-slate-600 text-xs leading-relaxed italic">
-                "Anjem dari kos Gunungpati ke kampus UNNES Sekaran cuman 9 ribu rupiah. Hemat banget dibanding naik angkot atau ojek biasa. Drivernya asyik diajak ngobrol."
-              </p>
-              <div className="flex items-center space-x-3">
-                <div className="font-bold text-xs bg-indigo-100 text-indigo-800 w-8 h-8 rounded-full flex items-center justify-center">AR</div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">Anisa Rahma</h4>
-                  <p className="text-[10px] text-slate-400">Fakultas Pendidikan - UNNES</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-5 rounded-xl bg-slate-50 border border-slate-200/70 flex flex-col justify-between space-y-5" id="testi-3">
-              <p className="text-slate-600 text-xs leading-relaxed italic">
-                "Fiturnya canggih, bisa liat history booking kita secara real-time. Kemarin coba pesan Anjem Mobil bareng 3 temen kelompok ke UDINUS jadi murah banget patungannya."
-              </p>
-              <div className="flex items-center space-x-3">
-                <div className="font-bold text-xs bg-indigo-100 text-indigo-800 w-8 h-8 rounded-full flex items-center justify-center">HW</div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">Hendra Wijaya</h4>
-                  <p className="text-[10px] text-slate-400">Fasilkom - UDINUS</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-12 px-4 border-t border-slate-800" id="landing-footer">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6" id="footer-inner">
-          <div className="text-center md:text-left">
-            <span className="font-extrabold text-white text-lg tracking-tight">ANJEM<span className="text-indigo-500">.SRG</span></span>
-            <p className="text-xs mt-1 text-slate-500">Sistem Pelayanan Antar Jemput Khusus Mahasiswa Semarang Terintegrasi Real-Time.</p>
+      <footer className="bg-slate-950 text-slate-400 py-16 px-4 border-t border-slate-900" id="landing-footer">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8" id="footer-inner">
+          <div className="text-center md:text-left space-y-2">
+            <span className="font-extrabold text-white text-2xl tracking-tight">ANJEM<span className="text-indigo-400"> SESHH</span></span>
+            <p className="text-xs text-slate-500">Solusi transportasi terintegrasi antar jemput real-time mahasiswa Semarang terpercaya.</p>
           </div>
           
           <div className="flex items-center space-x-6 text-xs" id="footer-links">
-            <span className="text-[11px] text-slate-600 font-mono">Real-Time Cloud Synchronization v2.1</span>
-            <button onClick={onLoginClick} className="text-white font-bold hover:text-indigo-400 transition cursor-pointer uppercase tracking-wider text-[10px] underline">Portal Masuk</button>
+            <span className="text-[10px] text-slate-600 font-mono">Build Ready &bull; Auth Secure v2.6</span>
+            <button onClick={onLoginClick} className="text-white font-bold hover:text-indigo-400 transition cursor-pointer uppercase tracking-widest text-[10px] underline">Daftar Jadi Driver</button>
           </div>
         </div>
-        <div className="max-w-7xl mx-auto border-t border-slate-800 mt-8 pt-6 text-center text-xs text-slate-600">
-          &copy; {new Date().getFullYear()} ANJEM.SRG. Powered by Google Firebase. Created exclusively for students of Semarang.
+        <div className="max-w-7xl mx-auto border-t border-slate-900 mt-10 pt-8 text-center text-xs text-slate-600">
+          &copy; {new Date().getFullYear()} ANJEM SESHH. Sistem ini terintegrasi sepenuhnya dengan Firebase NoSQL Database.
         </div>
       </footer>
     </div>

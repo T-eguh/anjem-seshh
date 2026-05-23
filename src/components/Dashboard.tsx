@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from "react";
-import { User, signOut } from "firebase/auth";
+import { User } from "firebase/auth";
 import { 
   collection, 
   query, 
@@ -8,9 +8,6 @@ import {
   doc, 
   setDoc, 
   updateDoc, 
-  addDoc, 
-  getDocs,
-  orderBy, 
   serverTimestamp, 
   deleteDoc 
 } from "firebase/firestore";
@@ -32,11 +29,127 @@ import {
   HelpCircle,
   RefreshCw,
   Send,
-  UserCheck
+  UserCheck,
+  Zap,
+  Navigation,
+  Compass,
+  DollarSign,
+  Briefcase,
+  Layers,
+  Heart
 } from "lucide-react";
-import { db, auth, OperationType, handleFirestoreError } from "../lib/firebase";
+import { db, OperationType, handleFirestoreError } from "../lib/firebase";
 import { Shuttle, Booking, Review, VehicleType } from "../types";
 import { SEMARANG_CAMPUSES } from "../data/mockData";
+import { motion } from "motion/react";
+
+export const getWhatsAppUrl = (whatsapp: string, driverName: string, bookingId: string, price: number, pickup: string, dropoff: string) => {
+  let clean = whatsapp.replace(/\D/g, "");
+  if (clean.startsWith("0")) {
+    clean = "62" + clean.slice(1);
+  }
+  if (!clean.startsWith("62") && clean.length > 5) {
+    clean = "62" + clean;
+  }
+  const text = encodeURIComponent(
+    `Halo bro/sist ${driverName}! Saya adalah pemesan layanan ANJEM SESHH Semarang dengan ID Pemesanan ${bookingId}.\n\n*Rincian Perjalanan*:\n- Penjemputan: ${pickup}\n- Tujuan: ${dropoff}\n- Tarif Estimasi: Rp ${price.toLocaleString("id")}\n\nApakah bisa dijemput sekarang? Terima kasih banyak!`
+  );
+  return `https://wa.me/${clean || "6281390000000"}?text=${text}`;
+};
+
+export function LiveGpsTracker({ booking }: { booking: Booking }) {
+  const [eta, setEta] = useState(12);
+  const [distance, setDistance] = useState(1.8);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (booking.status !== "accepted") return;
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) return 0;
+        return prev + 2;
+      });
+      setEta((prev) => {
+        if (prev <= 1) return 12;
+        return prev - 0.2;
+      });
+      setDistance((prev) => {
+        if (prev <= 0.1) return 1.8;
+         return prev - 0.03;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [booking.status]);
+
+  return (
+    <div className="bg-slate-950 text-slate-100 rounded-2xl p-4 border border-indigo-500/30 space-y-3 shadow-inner my-3 animate-fade-in">
+      <div className="flex justify-between items-center text-[10px] uppercase font-bold tracking-wider font-mono">
+        <span className="text-indigo-400 flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          SESHH-NAV GPS LOKATOR
+        </span>
+        <span className="text-slate-400">STATUS: TERKONEKSI</span>
+      </div>
+
+      {/* Grid Canvas Simulated Map */}
+      <div className="relative bg-[#070b19] rounded-xl h-24 overflow-hidden border border-slate-800/80 flex items-center justify-center">
+        {/* Grids */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff02_1px,transparent_1px),linear-gradient(to_bottom,#ffffff02_1px,transparent_1px)] bg-[size:8px_8px]"></div>
+        
+        {/* Landmarks */}
+        <div className="absolute left-3 top-3 text-[8px] text-slate-405 font-extrabold font-mono text-slate-400 leading-none">KOST ({booking.pickupLocation.substring(0, 14)}...)</div>
+        <div className="absolute right-3 bottom-0.5 text-[8px] text-indigo-400 font-extrabold font-mono leading-none">KAMPUS ({booking.campusName})</div>
+
+        {/* Dynamic Route Polyline */}
+        <svg className="absolute inset-0 w-full h-full text-slate-800" xmlns="http://www.w3.org/2000/svg">
+          <path 
+            className="stroke-indigo-950"
+            d="M 30,50 Q 150,15 150,55 T 320,55" 
+            fill="none" 
+            strokeWidth="3" 
+            strokeLinecap="round" 
+          />
+          <path 
+            className="stroke-indigo-500/80"
+            d="M 30,50 Q 150,15 150,55 T 320,55" 
+            fill="none" 
+            strokeWidth="3" 
+            strokeDasharray="8 4" 
+            strokeLinecap="round" 
+          />
+        </svg>
+
+        {/* Animated Motorcycle Dot */}
+        <div 
+          style={{
+            position: "absolute",
+            left: `${10 + (progress / 100) * 80}%`,
+            top: `${30 + Math.sin((progress / 100) * Math.PI) * 20}%`
+          }}
+          className="w-8 h-8 bg-indigo-600 border-2 border-indigo-400 rounded-full flex items-center justify-center shadow-lg shadow-indigo-600/50 transition-all duration-350"
+        >
+          <Bike className="h-4 w-4 text-white animate-bounce" />
+        </div>
+      </div>
+
+      {/* GPS metadata widgets */}
+      <div className="grid grid-cols-3 gap-2 text-center bg-white/5 p-2 rounded-xl text-[10px] font-mono">
+        <div>
+          <span className="text-slate-500 block text-[8px] uppercase font-bold">Jarak</span>
+          <span className="font-extrabold text-white text-xs">{distance.toFixed(2)} km</span>
+        </div>
+        <div>
+          <span className="text-slate-500 block text-[8px] uppercase font-bold">Kecepatan</span>
+          <span className="font-extrabold text-indigo-400 text-xs">42 km/h</span>
+        </div>
+        <div>
+          <span className="text-slate-500 block text-[8px] uppercase font-bold">Estimasi ETA</span>
+          <span className="font-extrabold text-emerald-400 text-xs">{Math.ceil(eta)} mnt</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface DashboardProps {
   user: User;
@@ -67,18 +180,44 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
 
-  // Driver simulation state
+  // Driver simulation states
   const [driverMode, setDriverMode] = useState(false);
   const [driverShuttle, setDriverShuttle] = useState<Shuttle | null>(null);
   const [driverBookings, setDriverBookings] = useState<Booking[]>([]);
+  const [driverReviews, setDriverReviews] = useState<Review[]>([]);
 
-  // Register Driver Form states
+  // Proximity Radar Matcher states (The Closest Driver Search)
+  const [radarPickup, setRadarPickup] = useState("Tembalang");
+  const [radarCampus, setRadarCampus] = useState("UNDIP");
+  const [isScanning, setIsScanning] = useState(false);
+  const [matchedDriver, setMatchedDriver] = useState<Shuttle | null>(null);
+  const [radarError, setRadarError] = useState<string | null>(null);
+  const [matchScore, setMatchScore] = useState<number | null>(null);
+
+  // Custom visual overlay modals/alerts for non-blocking iFrame friendly alerts
+  const [modalAlertMessage, setModalAlertMessage] = useState<string | null>(null);
+  const [confirmDeleteDriver, setConfirmDeleteDriver] = useState(false);
+
+  // Register Driver wizard states
   const [registeringAsDriver, setRegisteringAsDriver] = useState(false);
-  const [plateNumber, setPlateNumber] = useState("");
-  const [vehicleType, setVehicleType] = useState<VehicleType>("Motorcycle");
-  const [basePrice, setBasePrice] = useState(10000);
-  const [coverageInput, setCoverageInput] = useState("Tembalang, Banyumanik, Pleburan");
-  const [whatsappInput, setWhatsappInput] = useState("628");
+  const [regPlateNumber, setRegPlateNumber] = useState("");
+  const [regVehicleType, setRegVehicleType] = useState<VehicleType>("Motorcycle");
+  const [regBasePrice, setRegBasePrice] = useState(10000);
+  const [regWhatsapp, setRegWhatsapp] = useState("618");
+  const [regCampus, setRegCampus] = useState("UNDIP");
+  const [selectedRegions, setSelectedRegions] = useState<string[]>(["Tembalang", "Banyumanik"]);
+
+  const allAvailableSemarangRegions = [
+    "Tembalang",
+    "Banyumanik",
+    "Pleburan",
+    "Gunungpati",
+    "Sekaran",
+    "Ngaliyan",
+    "Sampangan",
+    "Kaligawe",
+    "Kota Lama"
+  ];
 
   // 1. Listen to available shuttles in real-time
   useEffect(() => {
@@ -143,7 +282,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
     return () => unsubscribe();
   }, [user.uid]);
 
-  // 3. Listen to driver's assigned bookings in real-time if driverMode is true
+  // 3. Listen to driver's assigned bookings in real-time
   useEffect(() => {
     if (!driverShuttle) return;
 
@@ -175,12 +314,122 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
     return () => unsubscribe();
   }, [driverShuttle]);
 
-  // 4. Handle booking submission (ordered by student)
+  // 4. Listen to driver reviews in real-time
+  useEffect(() => {
+    if (!driverShuttle) return;
+
+    const reviewsPath = "reviews";
+    const q = query(
+      collection(db, reviewsPath),
+      where("shuttleId", "==", driverShuttle.id)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const list: Review[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push(docSnap.data() as Review);
+        });
+        list.sort((a, b) => {
+          const timeA = a.createdAt?.seconds || 0;
+          const timeB = b.createdAt?.seconds || 0;
+          return timeB - timeA;
+        });
+        setDriverReviews(list);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, reviewsPath);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [driverShuttle]);
+
+  // Handle Close Notifications
+  const triggerCustomAlert = (msg: string) => {
+    setModalAlertMessage(msg);
+  };
+
+  // Perform dynamic Proximity GPS mapping algorithm
+  const handlePerformRadarSearch = (e: FormEvent) => {
+    e.preventDefault();
+    setIsScanning(true);
+    setMatchedDriver(null);
+    setRadarError(null);
+    setMatchScore(null);
+
+    setTimeout(() => {
+      // Proximity scoring system
+      // 1. Filter shuttles status 'Available' & not user him/herself
+      const candidates = shuttles.filter(
+        (s) => s.status === "Available" && s.id !== user.uid
+      );
+
+      if (candidates.length === 0) {
+        setRadarError("Mohon maaf, saat ini sedang tidak ada driver online yang bersiaga.");
+        setIsScanning(false);
+        return;
+      }
+
+      // 2. Score candidates based on:
+      // - Overlapping coverage areas with selected pickup location (High weight)
+      // - Rating (Medium weight)
+      // - Primary school matches chosen target (Medium weight)
+      const scored = candidates.map((shuttle) => {
+        let score = 50; // default baseline
+
+        // Matches region
+        const worksInRegion = shuttle.coverageAreas.some(
+          (area) => area.toLowerCase().includes(radarPickup.toLowerCase()) || 
+                    radarPickup.toLowerCase().includes(area.toLowerCase())
+        );
+        if (worksInRegion) score += 30;
+
+        // Matches target campus
+        const matchesCampus = shuttle.targetCampuses.some(
+          (c) => c.toLowerCase() === radarCampus.toLowerCase()
+        );
+        if (matchesCampus) score += 10;
+
+        // Rating bias
+        score += shuttle.rating * 2; // up to +10
+
+        return { shuttle, score };
+      });
+
+      // Sort descending by calculated score
+      scored.sort((a, b) => b.score - a.score);
+
+      const bestCandidate = scored[0];
+      setMatchedDriver(bestCandidate.shuttle);
+      setMatchScore(Math.min(99, Math.round(bestCandidate.score)));
+      setIsScanning(false);
+    }, 450);
+  };
+
+  // Pre-fill student order booking from Radar match result
+  const handleApplyMatchToBookingForm = (driver: Shuttle) => {
+    setSelectedShuttle(driver);
+    setPickup(`Area ${radarPickup}`);
+    setDestination(`Gedung Rektorat / Dekanat ${radarCampus}`);
+    setSelectedCampus(radarCampus);
+    setBookingSuccess(null);
+    setBookingError(null);
+    
+    // Smooth scrolling to the booking form panel
+    const formElement = document.getElementById("order-panel");
+    if (formElement) {
+      formElement.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  // 5. Handle booking submission (ordered by student)
   const handleCreateBooking = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedShuttle) return;
     if (!pickup.trim() || !destination.trim() || !phone.trim()) {
-      setBookingError("Harap isi seluruh kolom wajib.");
+      setBookingError("Harap lengkapi semua isian wajib.");
       return;
     }
 
@@ -199,6 +448,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
       studentPhone: phone,
       shuttleId: selectedShuttle.id,
       driverName: selectedShuttle.driverName,
+      driverWhatsapp: selectedShuttle.whatsapp || "628",
       pickupLocation: pickup,
       destination: destination,
       campusName: selectedCampus,
@@ -212,41 +462,41 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
     const bookingsPath = `bookings/${bookingId}`;
     try {
       await setDoc(doc(db, "bookings", bookingId), payload);
-      setBookingSuccess(`Sukses memesan Anjem dari ${selectedShuttle.driverName}!`);
-      // Reset state
+      setBookingSuccess(`Sukses memesan Anjem dari ${selectedShuttle.driverName}! Driver akan menghubungi Anda segera.`);
+      // Reset form options
       setSelectedShuttle(null);
-      setPickup("");
-      setDestination("");
-      setNotes("");
     } catch (error) {
-      setBookingError("Gagal memproses pesanan. Silakan coba lagi.");
+      setBookingError("Gagal memproses pemesanan. Database error.");
       handleFirestoreError(error, OperationType.CREATE, bookingsPath);
     } finally {
       setSubmittingBooking(false);
     }
   };
 
-  // 5. Submit Driver profile creation
+  // 6. Submit Driver profile creation
   const handleRegisterDriver = async (e: FormEvent) => {
     e.preventDefault();
-    if (!plateNumber.trim() || !whatsappInput.trim()) {
-      alert("Harap isi plat nomor dan nomor WhatsApp.");
+    if (!regPlateNumber.trim() || !regWhatsapp.trim()) {
+      triggerCustomAlert("Mohon isi plat nomor dan nomor WhatsApp Anda.");
+      return;
+    }
+    if (selectedRegions.length === 0) {
+      triggerCustomAlert("Silakan pilih minimal 1 Wilayah utama pelayanan Anda di Semarang.");
       return;
     }
 
-    const areas = coverageInput.split(",").map(a => a.trim()).filter(Boolean);
     const shuttleId = user.uid;
 
     const payload: Shuttle = {
       id: shuttleId,
       driverName: user.displayName || "Driver Mahasiswa",
-      driverPhoto: user.photoURL || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80",
-      vehicleType,
-      plateNumber: plateNumber.toUpperCase(),
-      whatsapp: whatsappInput.startsWith("62") ? whatsappInput : `62${whatsappInput.replace(/^0+/, "")}`,
-      coverageAreas: areas,
-      targetCampuses: [selectedCampus],
-      basePrice,
+      driverPhoto: user.photoURL || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&auto=format&fit=crop&q=80",
+      vehicleType: regVehicleType,
+      plateNumber: regPlateNumber.toUpperCase(),
+      whatsapp: regWhatsapp.startsWith("62") ? regWhatsapp : `62${regWhatsapp.replace(/^0+/, "")}`,
+      coverageAreas: selectedRegions,
+      targetCampuses: [regCampus],
+      basePrice: regBasePrice,
       status: "Available",
       rating: 5.0,
       totalTrips: 0
@@ -262,7 +512,15 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
     }
   };
 
-  // 6. Student cancels booking
+  const handleRegionCheckbox = (region: string) => {
+    if (selectedRegions.includes(region)) {
+      setSelectedRegions(selectedRegions.filter((r) => r !== region));
+    } else {
+      setSelectedRegions([...selectedRegions, region]);
+    }
+  };
+
+  // 7. Student cancels booking
   const handleCancelBooking = async (booking: Booking) => {
     if (booking.status !== "pending") return;
     const path = `bookings/${booking.id}`;
@@ -276,7 +534,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
     }
   };
 
-  // 7. Simulating driver status update (for real-time demo)
+  // 8. Driver status update handler
   const handleSimulateStatus = async (bookingId: string, newStatus: "accepted" | "completed" | "cancelled") => {
     const path = `bookings/${bookingId}`;
     try {
@@ -288,21 +546,26 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
         updatedAt: serverTimestamp(),
       });
 
-      // If completing, let's increment driver total trips and update status
+      // Update driver online state on trip triggers
+      const driverRef = doc(db, "shuttles", match.shuttleId);
       if (newStatus === "completed") {
-        const driverRef = doc(db, "shuttles", match.shuttleId);
         try {
+          const currentTrips = driverShuttle ? driverShuttle.totalTrips + 1 : 1;
           await updateDoc(driverRef, {
-            status: "Available"
+            status: "Available",
+            totalTrips: currentTrips
           });
-        } catch (e) {
-          // It's okay if seed drivers don't allow update because of ID difference, we gracefully skip
-        }
+        } catch (e) { }
       } else if (newStatus === "accepted") {
-        const driverRef = doc(db, "shuttles", match.shuttleId);
         try {
           await updateDoc(driverRef, {
             status: "Busy"
+          });
+        } catch (e) { }
+      } else if (newStatus === "cancelled") {
+        try {
+          await updateDoc(driverRef, {
+            status: "Available"
           });
         } catch (e) { }
       }
@@ -311,7 +574,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
     }
   };
 
-  // 8. Submit feedback review
+  // 9. Submit review feedback rating
   const handleReviewSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!reviewingBooking) return;
@@ -333,7 +596,22 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
     try {
       await setDoc(doc(db, "reviews", reviewId), payload);
       
-      // Update booking status locally or mark as fully archived so review modal closes
+      // Compute and update new driver total rating in shuttles
+      const driverRef = doc(db, "shuttles", reviewingBooking.shuttleId);
+      // Fetch currently matched driver records to compute moving average
+      const driverTarget = shuttles.find(s => s.id === reviewingBooking.shuttleId);
+      if (driverTarget) {
+        const previousRating = driverTarget.rating || 5.0;
+        const totalReviewsCount = driverReviews.length + 1;
+        const nextRating = ((previousRating * (totalReviewsCount - 1)) + reviewRating) / totalReviewsCount;
+        
+        try {
+          await updateDoc(driverRef, {
+            rating: Math.round(nextRating * 10) / 10
+          });
+        } catch (xe) {}
+      }
+
       setReviewingBooking(null);
       setReviewComment("");
       setReviewRating(5);
@@ -347,50 +625,105 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   // Delete driver registration
   const handleDeleteDriverAccount = async () => {
     if (!driverShuttle) return;
-    if (confirm("Apakah Anda yakin ingin berhenti menjadi driver Anjem Semarang?")) {
-      const path = `shuttles/${driverShuttle.id}`;
-      try {
-        await deleteDoc(doc(db, "shuttles", driverShuttle.id));
-        setDriverShuttle(null);
-        setDriverMode(false);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, path);
-      }
+    const path = `shuttles/${driverShuttle.id}`;
+    try {
+      await deleteDoc(doc(db, "shuttles", driverShuttle.id));
+      setDriverShuttle(null);
+      setDriverMode(false);
+      setConfirmDeleteDriver(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
     }
   };
 
+  // Compute overall driver income
+  const totalDriverEarnings = driverBookings
+    .filter((b) => b.status === "completed")
+    .reduce((sum, b) => sum + b.price, 0);
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900" id="dashboard-container">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 px-4 py-3 mr-auto ml-auto w-full max-w-7xl" id="dash-header">
-        <div className="flex items-center justify-between mx-auto" id="dash-header-inner">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800" id="dashboard-container">
+      
+      {/* Dynamic Overlay Notification Modal Block */}
+      {modalAlertMessage && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full border border-slate-200">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+              <h4 className="font-extrabold text-sm text-slate-900 leading-tight">Pemberitahuan Sistem</h4>
+            </div>
+            <p className="text-xs text-slate-505 leading-relaxed mb-6">{modalAlertMessage}</p>
+            <button 
+              onClick={() => setModalAlertMessage(null)}
+              className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-xs uppercase tracking-wider"
+            >
+              Baik, Mengerti
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Driver Account Modal */}
+      {confirmDeleteDriver && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full border border-slate-200">
+            <div className="flex items-center space-x-3 text-red-650 justify-center mb-4">
+              <AlertCircle className="h-10 w-10 text-red-500 animate-bounce" />
+            </div>
+            <h4 className="font-extrabold text-base text-slate-900 text-center mb-2">Hapus Driver Registrasi?</h4>
+            <p className="text-xs text-slate-500 text-center leading-relaxed mb-6">
+              Apakah Anda benar-benar yakin ingin berhenti &amp; menghapus seluruh data driver Anda dari platform ANJEM SESHH?
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button 
+                onClick={() => setConfirmDeleteDriver(false)}
+                className="py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs uppercase"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={handleDeleteDriverAccount}
+                className="py-2.5 bg-red-650 hover:bg-red-700 text-white font-bold rounded-xl text-xs uppercase"
+              >
+                Hapus Permanen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header and Branding Navbar */}
+      <header className="bg-white border-b border-slate-250/70 sticky top-0 z-40 w-full" id="dash-header">
+        <div className="max-w-7xl mx-auto px-4 py-3.5 flex items-center justify-between" id="dash-header-inner">
           <div className="flex items-center space-x-3" id="dash-logo">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-bold text-white text-xl shadow-lg shadow-indigo-600/20">
-              A
+            <div className="w-10 h-10 bg-indigo-650 rounded-xl flex items-center justify-center font-bold text-white text-xl shadow-md shadow-indigo-600/20">
+              <Compass className="h-5.5 w-5.5" />
             </div>
             <div>
-              <span className="font-extrabold text-lg text-slate-900 tracking-tight">ANJEM<span className="text-indigo-600">.SRG</span></span>
-              <span className="block text-[9px] text-slate-400 font-mono uppercase tracking-wider">Sistem Pelayanan</span>
+              <span className="font-extrabold text-xl text-slate-900 tracking-tight">ANJEM<span className="text-indigo-650"> SESHH</span></span>
+              <span className="block text-[9px] text-slate-400 font-mono font-bold uppercase tracking-wide">Portal Real-Time Semarang</span>
             </div>
           </div>
 
           <div className="flex items-center space-x-4 animate-fade-in" id="dash-user">
-            {/* Real-time simulation status pulse */}
-            <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-full border border-slate-200">
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">SYSTEM ACTIVE</span>
+            {/* Real-time sync tracker */}
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-indigo-50/50 rounded-full border border-indigo-100/50">
+              <div className="w-1.5 h-1.5 bg-indigo-605 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-[9px] font-bold text-indigo-700 uppercase tracking-widest leading-none">Database Terhubung</span>
             </div>
 
-            {/* Real-time simulation status toggle */}
-            <div className="hidden sm:flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
+            {/* Simulated Desktop mode selection switcher */}
+            <div className="hidden sm:flex items-center bg-slate-100 p-1 rounded-xl border border-slate-205">
               <button
                 type="button"
                 onClick={() => setDriverMode(false)}
-                className={`px-3 py-1 text-xs font-bold uppercase tracking-wider rounded transition-all cursor-pointer ${
-                  !driverMode ? "bg-white text-indigo-700 shadow-xs" : "text-slate-500 hover:text-slate-900"
+                className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition duration-200 cursor-pointer ${
+                  !driverMode ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-900"
                 }`}
               >
-                Sewa Anjem
+                Sewa Anjem Mhs
               </button>
               <button
                 type="button"
@@ -401,47 +734,47 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
                     setDriverMode(true);
                   }
                 }}
-                className={`px-3 py-1 text-xs font-bold uppercase tracking-wider rounded transition-all cursor-pointer ${
-                  driverMode ? "bg-white text-indigo-700 shadow-xs" : "text-slate-500 hover:text-slate-900"
+                className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition duration-200 cursor-pointer ${
+                  driverMode ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-900"
                 }`}
               >
-                Jadi Driver {driverShuttle && "🟢"}
+                Kemudi (Driver Station) {driverShuttle && "🟢"}
               </button>
             </div>
 
-            <div className="flex items-center space-x-2 border-l border-slate-200 pl-4">
+            {/* Profile widget */}
+            <div className="flex items-center space-x-2.5 border-l border-slate-200 pl-4">
               <img 
-                src={user.photoURL || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80"} 
+                src={user.photoURL || "https://images.unsplash.com/photo-154405313-94ddf0286df2?w=100&auto=format&fit=crop&q=80"} 
                 alt="Profile" 
                 referrerPolicy="no-referrer"
-                className="w-8 h-8 rounded-full border border-slate-200"
+                className="w-9 h-9 rounded-full border border-slate-200 shadow-xs"
               />
               <div className="hidden lg:block text-left">
-                <span className="block text-xs font-black text-slate-900">{user.displayName || "Mahasiswa"}</span>
-                <span className="block text-[9px] text-slate-400 font-mono">{user.email}</span>
+                <span className="block text-xs font-extrabold text-slate-900 leading-none">{user.displayName || "Mahasiswa"}</span>
+                <span className="block text-[9px] text-slate-400 font-mono mt-0.5">{user.email}</span>
               </div>
             </div>
 
             <button
               onClick={onLogout}
-              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-              title="Keluar"
+              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition"
+              title="Keluar dari Akun"
               id="btn-logout"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-4.5 w-4.5" />
             </button>
           </div>
         </div>
       </header>
 
-      {/* Main Dashboard Content */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-6" id="dash-main">
-        {/* Mobile View Toggle */}
-        <div className="flex sm:hidden items-center justify-between mb-4 bg-white p-1 border border-slate-200 rounded-xl" id="dash-mobile-tabs">
+      {/* Mobile Interactive Platform Mode Switcher */}
+      <div className="sm:hidden px-4 pt-4 pb-1" id="dash-mobile-tabs">
+        <div className="flex items-center justify-between bg-white p-1 border border-slate-200 rounded-xl shadow-xs">
           <button
             onClick={() => setDriverMode(false)}
-            className={`flex-1 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider rounded-lg transition ${
-              !driverMode ? "bg-indigo-600 text-white" : "text-slate-600"
+            className={`flex-1 py-2 text-center text-xs font-extrabold uppercase tracking-wider rounded-lg transition ${
+              !driverMode ? "bg-indigo-600 text-white" : "text-slate-500"
             }`}
           >
             Sewa Anjem
@@ -454,168 +787,153 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
                 setDriverMode(true);
               }
             }}
-            className={`flex-1 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider rounded-lg transition ${
+            className={`flex-1 py-2 text-center text-xs font-extrabold uppercase tracking-wider rounded-lg transition ${
               driverMode ? "bg-indigo-600 text-white" : "text-slate-600"
             }`}
           >
             Jadi Driver {driverShuttle && "🟢"}
           </button>
         </div>
+      </div>
 
-        {/* High Density Premium Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Tercatat di Sistem</p>
-            <h3 className="text-xl font-black mt-1 text-slate-900">
-              {driverMode ? driverBookings.length : myBookings.length} Perjalanan
-            </h3>
-            <p className="text-[10px] text-indigo-600 font-semibold mt-1">✓ Update Real-time</p>
-          </div>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Armada Terpasang</p>
-            <h3 className="text-xl font-black mt-1 text-indigo-600">{shuttles.length} Driver</h3>
-            <p className="text-[10px] text-slate-400 font-medium mt-1">Siap mengangkut mahasiswa</p>
-          </div>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Estimasi Tempuh</p>
-            <h3 className="text-xl font-black mt-1 text-slate-900">3 - 10 Menit</h3>
-            <p className="text-[10px] text-slate-400 font-medium mt-1">Respon instan tercepat</p>
-          </div>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Domain Jaringan</p>
-            <h3 className="text-xl font-black mt-1 text-teal-600">Semarang</h3>
-            <p className="text-[10px] text-slate-400 font-medium mt-1">Cloud Sync Firebase Active</p>
-          </div>
-        </div>
-
-        {/* DRIVER REGISTRATION DIALOG */}
+      {/* Main Core Viewport */}
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-6" id="dash-main">
+        
+        {/* Dynamic Multi-Step Driver Registration Dialog */}
         {registeringAsDriver && (
-          <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-md w-full border border-slate-200 animate-slide-up">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-base text-slate-950 uppercase tracking-wider">Form Pendaftaran Driver</h3>
-                <button onClick={() => setRegisteringAsDriver(false)} className="p-1 hover:bg-slate-100 rounded-lg">
-                  <X className="h-4 w-4 text-slate-400" />
+          <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl p-6 md:p-8 shadow-2xl max-w-lg w-full border border-slate-205 animate-slide-up space-y-6">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 uppercase tracking-widest font-mono">Daftar Pengemudi Anjem</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Luar biasa! Masukkan detail akurat kendaraan Anda.</p>
+                </div>
+                <button onClick={() => setRegisteringAsDriver(false)} className="p-2 hover:bg-slate-100 rounded-xl transition cursor-pointer">
+                  <X className="h-5 w-5 text-slate-400" />
                 </button>
               </div>
-              <p className="text-slate-500 text-xs leading-relaxed mb-4">
-                Sistem Terpadu Antar Jemput Semarang terintegrasi dengan Google Firestore. Konfigurasikan detail kendaraan Anda agar dapat disewa mahasiswa Semarang secara dinamis!
-              </p>
 
               <form onSubmit={handleRegisterDriver} className="space-y-4">
-                <div>
-                  <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-700 mb-1">Status Nama Driver</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={user.displayName || "Driver"}
-                    className="w-full bg-slate-100 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-500 font-bold"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[9px] uppercase tracking-widest font-extrabold text-slate-500 mb-1">Armada Transportasi</label>
+                    <select
+                      value={regVehicleType}
+                      onChange={(e) => setRegVehicleType(e.target.value as VehicleType)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-semibold focus:ring-1 focus:ring-indigo-500 focus:outline-none text-slate-900"
+                    >
+                      <option className="text-slate-900" value="Motorcycle">Motor pribadi</option>
+                      <option className="text-slate-900" value="Car">Mobil pribadi</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] uppercase tracking-widest font-extrabold text-slate-500 mb-1">Nomor Plat Mobil/Motor</label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: H 6245 AWG"
+                      required
+                      value={regPlateNumber}
+                      onChange={(e) => setRegPlateNumber(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-semibold focus:ring-1 focus:ring-indigo-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-700 mb-1">Tipe Armada</label>
-                    <select
-                      value={vehicleType}
-                      onChange={(e) => setVehicleType(e.target.value as VehicleType)}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-                    >
-                      <option value="Motorcycle">Motor</option>
-                      <option value="Car">Mobil</option>
-                    </select>
+                    <label className="block text-[9px] uppercase tracking-widest font-extrabold text-slate-500 mb-1">Tarif Dasar Jasa (Rp)</label>
+                    <input
+                      type="number"
+                      min="4000"
+                      step="1000"
+                      value={regBasePrice}
+                      onChange={(e) => setRegBasePrice(Number(e.target.value))}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-semibold focus:ring-1 focus:ring-indigo-500 focus:outline-none text-slate-900"
+                    />
                   </div>
                   <div>
-                    <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-700 mb-1">Plat Nomor Kendaraan</label>
+                    <label className="block text-[9px] uppercase tracking-widest font-extrabold text-slate-500 mb-1">WhatsApp Aktif (Kode Negara)</label>
                     <input
                       type="text"
-                      placeholder="H 1234 AWG"
                       required
-                      value={plateNumber}
-                      onChange={(e) => setPlateNumber(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
+                      placeholder="628xxxxxxxx (Gunakan 62)"
+                      value={regWhatsapp}
+                      onChange={(e) => setRegWhatsapp(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-mono focus:ring-1 focus:ring-indigo-500 text-slate-900 placeholder:text-slate-400"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-700 mb-1">Tarif Dasar Kampus (Rp)</label>
-                  <input
-                    type="number"
-                    min="5000"
-                    step="1000"
-                    value={basePrice}
-                    onChange={(e) => setBasePrice(Number(e.target.value))}
-                    className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-700 mb-1">Cakupan Wilayah Semarang (Koma-pisahkan)</label>
-                  <input
-                    type="text"
-                    placeholder="Tembalang, Banyumanik, Pleburan"
-                    value={coverageInput}
-                    onChange={(e) => setCoverageInput(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-700 mb-1">Nomor WhatsApp Aktif</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="628123456789"
-                    value={whatsappInput}
-                    onChange={(e) => setWhatsappInput(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] uppercase tracking-wider font-bold text-slate-700 mb-1">Target Kampus Utama</label>
+                  <label className="block text-[9px] uppercase tracking-widest font-extrabold text-slate-500 mb-1">Fakultas / Kampus Target Utama</label>
                   <select
-                    value={selectedCampus}
-                    onChange={(e) => setSelectedCampus(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs"
+                    value={regCampus}
+                    onChange={(e) => setRegCampus(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-semibold text-slate-900"
                   >
                     {SEMARANG_CAMPUSES.map(c => (
-                      <option key={c.id} value={c.name}>{c.name} - {c.fullName}</option>
+                      <option className="text-slate-900" key={c.id} value={c.name}>{c.name} - {c.fullName}</option>
                     ))}
                   </select>
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition cursor-pointer"
-                >
-                  Daftar Sekarang & Masuk Driver Station
-                </button>
+                {/* Region Checklist Picker */}
+                <div>
+                  <label className="block text-[9px] uppercase tracking-widest font-extrabold text-slate-500 mb-2">Cakupan Wilayah Operasional (Semarang)</label>
+                  <div className="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-150">
+                    {allAvailableSemarangRegions.map((region) => {
+                      const isChecked = selectedRegions.includes(region);
+                      return (
+                        <button
+                          type="button"
+                          key={region}
+                          onClick={() => handleRegionCheckbox(region)}
+                          className={`py-2 px-1 text-[10px] font-bold rounded-lg uppercase tracking-wider text-center border transition ${
+                            isChecked 
+                              ? "bg-indigo-600 border-indigo-600 text-white shadow-sm" 
+                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+                          }`}
+                        >
+                          {region}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="pt-4">
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 bg-indigo-600 hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-widest rounded-xl transition shadow-lg"
+                  >
+                    Selesaikan &amp; Aktifkan Driver Mode
+                  </button>
+                </div>
               </form>
             </div>
           </div>
         )}
 
-        {/* FEEDBACK REVIEW DIALOG */}
+        {/* FEEDBACK REVIEW MODAL */}
         {reviewingBooking && (
-          <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full border border-slate-200 animate-scale-up">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-sm text-slate-950 uppercase tracking-wider">Ulasan Perjalanan</h3>
+          <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full border border-slate-205 animate-scale-up space-y-5">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 className="font-extrabold text-xs text-slate-900 uppercase tracking-widest font-mono">Beri Ulasan Perjalanan</h3>
                 <button onClick={() => setReviewingBooking(null)} className="p-1 hover:bg-slate-100 rounded-lg">
-                  <X className="h-4 w-4 text-slate-400" />
+                  <X className="h-4.5 w-4.5 text-slate-400" />
                 </button>
               </div>
 
-              <div className="mb-4 text-center">
-                <span className="block text-[10px] text-slate-400 font-bold uppercase font-mono mb-0.5">Sewa Driver Anjem</span>
-                <p className="font-extrabold text-sm text-indigo-700">{reviewingBooking.driverName}</p>
+              <div className="text-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <span className="block text-[9px] text-slate-400 font-bold uppercase">Sewa Jasa Driver</span>
+                <p className="font-black text-sm text-indigo-700">{reviewingBooking.driverName}</p>
+                <p className="text-[10px] text-slate-400 font-mono mt-0.5">{reviewingBooking.pickupLocation} &rarr; {reviewingBooking.destination}</p>
               </div>
 
               <form onSubmit={handleReviewSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-2 text-center">Beri Penilaian Bintang</label>
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-700 text-center">Bintang Penilaian Anda</label>
                   <div className="flex items-center justify-center space-x-2">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <button
@@ -624,74 +942,91 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
                         onClick={() => setReviewRating(star)}
                         className="p-1 text-yellow-400 hover:scale-110 transition cursor-pointer"
                       >
-                        <Star className={`h-7 w-7 ${reviewRating >= star ? "fill-yellow-400" : "text-slate-300"}`} />
+                        <Star className={`h-8 w-8 ${reviewRating >= star ? "fill-yellow-400" : "text-slate-350"}`} />
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] uppercase font-bold text-slate-700 tracking-wider mb-1">Catatan Kesan Mahasiswa</label>
+                <div className="space-y-1">
+                  <label className="block text-[9px] uppercase font-bold text-slate-500 tracking-wider">Tulis Catatan / Kesan</label>
                   <textarea
                     required
-                    placeholder="Tulis ulasan singkat..."
+                    placeholder="Pelayanan ramah, tepat waktu, helmnya bersih!"
                     rows={3}
                     value={reviewComment}
                     onChange={(e) => setReviewComment(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-indigo-600 focus:bg-white"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs focus:ring-1 focus:ring-indigo-500 focus:bg-white focus:outline-none"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={submittingReview}
-                  className="w-full py-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition cursor-pointer"
+                  className="w-full py-3 bg-slate-900 hover:bg-indigo-600 disabled:bg-slate-500 text-white text-xs font-bold uppercase tracking-widest rounded-xl transition cursor-pointer"
                 >
-                  {submittingReview ? "Mengirim ulasan..." : "Kirim Ulasan & Selesaikan"}
+                  {submittingReview ? "Mengupload..." : "Kirim Ulasan Bintang"}
                 </button>
               </form>
             </div>
           </div>
         )}
 
-        {/* VIEW 1: PORTAL DRIVER & SIMULATION CONTROL */}
+        {/* ------------------------------------------------------------------- */}
+        {/* VIEW 1: DRIVE STATION HUB */}
+        {/* ------------------------------------------------------------------- */}
         {driverMode ? (
-          <div className="space-y-6" id="driver-workspace">
-            {/* Driver Profile Summary */}
+          <div className="space-y-6 animate-fade-in" id="driver-workspace">
+            {/* Driver Professional Card Summary */}
             {driverShuttle ? (
-              <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-md border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-6" id="driver-summary">
-                <div className="flex items-center space-x-4">
+              <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl border border-slate-800 grid grid-cols-1 md:grid-cols-12 gap-6 items-center" id="driver-profile-header">
+                
+                <div className="md:col-span-6 flex items-center space-x-4">
                   <img 
                     src={driverShuttle.driverPhoto} 
                     alt="Driver Photo" 
-                    className="w-14 h-14 rounded-full border-2 border-indigo-500 object-cover"
+                    referrerPolicy="no-referrer"
+                    className="w-16 h-16 rounded-full border-2 border-indigo-400 object-cover"
                   />
                   <div>
                     <div className="flex items-center space-x-2">
                       <h2 className="font-extrabold text-lg text-white">{driverShuttle.driverName}</h2>
-                      <span className="px-2.5 py-0.5 text-[9px] font-bold bg-indigo-600 text-white rounded-full uppercase tracking-wider">Driver Aktif</span>
+                      <span className="px-2.5 py-0.5 text-[8px] font-extrabold bg-indigo-650 text-white rounded-full uppercase tracking-wider font-mono">DRV_ACTIVE</span>
                     </div>
-                    <p className="text-xs text-slate-400 font-mono mt-0.5">{driverShuttle.plateNumber} &bull; {driverShuttle.vehicleType === "Motorcycle" ? "Motor" : "Mobil"}</p>
-                    <div className="flex items-center space-x-2 mt-1.5 text-xs text-slate-350">
-                      <MapPin className="h-3.5 w-3.5 text-indigo-400" />
-                      <span>{driverShuttle.coverageAreas.join(", ")}</span>
+                    <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-400">
+                      <span>{driverShuttle.plateNumber}</span>
+                      <span>&bull;</span>
+                      <span className="flex items-center gap-1">
+                        {driverShuttle.vehicleType === "Motorcycle" ? <Bike className="w-3.5 h-3.5" /> : <Car className="w-3.5 h-3.5" />}
+                        {driverShuttle.vehicleType === "Motorcycle" ? "Motor" : "Mobil"}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1.5 mt-2 text-xs text-indigo-350">
+                      <MapPin className="h-4 w-4 text-indigo-400" />
+                      <span>{driverShuttle.coverageAreas.join(", ")} &bull; {driverShuttle.targetCampuses.join(", ")}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4 border-t border-slate-850 pt-4 md:border-none md:pt-0" id="driver-shuttle-actions">
-                  <div className="bg-slate-800 px-4 py-2 rounded-lg border border-white/5 text-center min-w-[80px]">
-                    <span className="block text-[8px] text-slate-400 uppercase tracking-wider font-mono font-bold">Total Trip</span>
-                    <span className="text-sm font-black text-amber-400">{driverShuttle.totalTrips}</span>
+                <div className="md:col-span-6 flex flex-wrap items-center justify-start md:justify-end gap-3" id="driver-shuttle-actions">
+                  <div className="bg-slate-850 px-4 py-2 rounded-xl border border-white/5 text-center min-w-[90px]">
+                    <span className="block text-[8px] text-slate-400 uppercase tracking-widest font-mono font-bold">Uang Masuk</span>
+                    <span className="text-sm font-black text-emerald-400 font-mono">Rp {totalDriverEarnings.toLocaleString("id")}</span>
                   </div>
 
-                  <div className="bg-slate-800 px-4 py-2 rounded-lg border border-white/5 text-center min-w-[80px]">
-                    <span className="block text-[8px] text-slate-400 uppercase tracking-wider font-mono font-bold">Rating</span>
-                    <span className="text-sm font-black text-teal-400 flex items-center justify-center">
-                      {driverShuttle.rating.toFixed(1)} <Star className="h-3 w-3 fill-amber-400 text-amber-400 ml-0.5" />
+                  <div className="bg-slate-850 px-4 py-2 rounded-xl border border-white/5 text-center min-w-[90px]">
+                    <span className="block text-[8px] text-slate-400 uppercase tracking-widest font-mono font-bold">Total Trip</span>
+                    <span className="text-sm font-black text-amber-400 font-mono">{driverShuttle.totalTrips}</span>
+                  </div>
+
+                  <div className="bg-slate-850 px-4 py-2 rounded-xl border border-white/5 text-center min-w-[90px]">
+                    <span className="block text-[8px] text-slate-400 uppercase tracking-widest font-mono font-bold">Rating</span>
+                    <span className="text-sm font-black text-teal-400 flex items-center justify-center font-mono">
+                      {driverShuttle.rating.toFixed(1)} <Star className="h-3 w-3 fill-amber-400 text-amber-400 ml-1" />
                     </span>
                   </div>
 
+                  {/* Active Offline / Online toggle */}
                   <button
                     onClick={async () => {
                       const nextStatus = driverShuttle.status === "Available" ? "Offline" : "Available";
@@ -704,114 +1039,129 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
                         handleFirestoreError(e, OperationType.UPDATE, path);
                       }
                     }}
-                    className={`px-3.5 py-2 text-[10px] uppercase tracking-wider font-extrabold rounded-lg transition border cursor-pointer ${
+                    className={`px-4 py-2.5 text-[10px] uppercase tracking-widest font-extrabold rounded-xl transition border cursor-pointer ${
                       driverShuttle.status === "Available" 
-                      ? "bg-slate-850 border-indigo-500 text-indigo-400" 
-                      : "bg-red-950/20 border-red-500 text-red-400"
+                      ? "bg-slate-850 border-emerald-500 text-emerald-400" 
+                      : "bg-red-950/20 border-red-500 text-red-400 hover:bg-slate-850"
                     }`}
                   >
-                    Status: {driverShuttle.status === "Available" ? "ON (Menerima)" : "OFF (Istirahat)"}
+                    {driverShuttle.status === "Available" ? "🟢 MENERIMA REQ" : "🔴 ISTIRAHAT"}
                   </button>
 
                   <button
-                    onClick={handleDeleteDriverAccount}
-                    className="px-3.5 py-2 text-[10px] uppercase tracking-wider font-bold rounded-lg bg-red-950/20 text-red-400 hover:bg-red-900 hover:text-white border border-red-900/30 transition cursor-pointer"
+                    onClick={() => setConfirmDeleteDriver(true)}
+                    className="px-4 py-2.5 text-[10px] uppercase tracking-widest font-bold rounded-xl bg-red-950/20 text-red-400 hover:bg-red-800 hover:text-white border border-red-900/30 transition cursor-pointer"
                   >
-                    Hapus Akun
+                    Hapus
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-4" id="driver-inactive-state">
-                <AlertCircle className="h-10 w-10 text-amber-500 mx-auto" />
-                <h3 className="font-extrabold text-base text-slate-950">Anda Belum Terdaftar Sebagai Driver</h3>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                  Daftarkan kendaraan pribadi Anda sekarang di portal untuk dapat melayani pesanan dari mahasiswa kampus Semarang.
+              <div className="bg-white rounded-3xl p-8 border border-slate-200 text-center space-y-4" id="driver-inactive-state">
+                <AlertCircle className="h-12 w-12 text-amber-500 mx-auto" />
+                <h3 className="font-extrabold text-base text-slate-900 uppercase tracking-wider">Belum Teraktivasi Sebagai Driver</h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                  Konfigurasikan tarif, plat motor/mobil pribadi, dan area pangkalan Semarang Anda untuk mulai menerima order sewa antar jemput langsung dari mahasiswa!
                 </p>
                 <button
                   onClick={() => setRegisteringAsDriver(true)}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-wider rounded-lg transition cursor-pointer"
+                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-widest rounded-xl transition cursor-pointer"
                 >
-                  Daftar Sebagai Driver
+                  Buka Form Pendaftaran Driver
                 </button>
               </div>
             )}
 
-            {/* Simulated Driver Booking Management */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="driver-simulation-sections">
-              {/* Box 1: Student Orders assigned to Me */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200 space-y-4" id="assigned-order-box">
+            {/* Simulated Live Orders & Customer Feedback Logs */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="driver-simulation-sections">
+              
+              {/* Left Column (8 cols): Orders Log */}
+              <div className="lg:col-span-8 bg-white rounded-3xl p-6 border border-slate-200 space-y-5" id="assigned-order-box">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center space-x-2">
-                    <ClipboardList className="h-5 w-5 text-indigo-600" />
-                    <h3 className="font-extrabold text-sm text-slate-900 uppercase tracking-wider">Antre Pesanan Masuk</h3>
+                    <ClipboardList className="h-5 w-5 text-indigo-650 animate-pulse" />
+                    <h3 className="font-extrabold text-xs text-slate-900 uppercase tracking-wider font-mono">Daftar Reservasi Masuk</h3>
                   </div>
                   <span className="px-2.5 py-0.5 text-[10px] bg-slate-100 text-slate-700 rounded-full font-mono font-bold">
-                    {driverBookings.length} Total
+                    {driverBookings.length} Total Orderan
                   </span>
                 </div>
 
                 {driverBookings.length === 0 ? (
-                  <div className="text-center py-12 text-slate-400 space-y-2">
-                    <CheckCircle className="h-7 w-7 text-slate-200 mx-auto" />
-                    <p className="text-xs font-semibold text-slate-600">Belum ada pesanan masuk.</p>
-                    <p className="text-[10px] text-slate-400 max-w-xs mx-auto">Gunakan portal sebelah kiri untuk memesan perjalanan simulasi ke driver ini lalu lihat pemutakhiran real-time di sini!</p>
+                  <div className="text-center py-20 text-slate-400 space-y-3">
+                    <CheckCircle className="h-10 w-10 text-slate-200 mx-auto" />
+                    <p className="text-xs font-bold text-slate-700">Belum ada mahasiswa memesan perjalanan Anda.</p>
+                    <p className="text-[11px] text-slate-400 max-w-md mx-auto leading-relaxed">
+                      Anda bisa membuka tab <strong>Sewa Anjem Mhs</strong> di atas, lalu memesan perjalanan simulasi yang menarget diri Anda sendiri untuk menguji sinkronisasi real-time instan!
+                    </p>
                   </div>
                 ) : (
-                  <div className="space-y-3 max-h-[450px] overflow-y-auto pr-1" id="driver-bookings-list">
+                  <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1" id="driver-bookings-list">
                     {driverBookings.map((booking) => (
                       <div 
                         key={booking.id} 
-                        className="p-4 rounded-xl border border-slate-200 bg-slate-50 hover:border-indigo-300 transition space-y-3"
+                        className="p-5 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-white hover:shadow-md transition duration-300 space-y-4"
                       >
-                        <div className="flex justify-between items-center bg-white px-2.5 py-1.5 rounded-lg border border-slate-100">
+                        <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-xs">
                           <div>
-                            <span className="block text-xs font-bold text-slate-900">{booking.studentName}</span>
-                            <span className="block text-[8px] font-mono text-slate-400">UID: {booking.studentUid.substr(0, 8)}...</span>
+                            <span className="block text-xs font-black text-slate-900">{booking.studentName}</span>
+                            <span className="block text-[9px] font-mono text-slate-400">Telp: {booking.studentPhone} &bull; {booking.studentEmail}</span>
                           </div>
-                          <span className={`px-2 py-0.5 text-[10px] font-mono font-bold rounded uppercase ${
+                          <span className={`px-2.5 py-0.5 text-[9px] font-bold rounded uppercase ${
                             booking.status === "pending" ? "bg-amber-100 text-amber-800" :
                             booking.status === "accepted" ? "bg-indigo-100 text-indigo-800 animate-pulse" :
-                            booking.status === "completed" ? "bg-teal-100 text-teal-800" :
+                            booking.status === "completed" ? "bg-green-100 text-green-800" :
                             "bg-slate-200 text-slate-700"
                           }`}>
-                            {booking.status === "pending" ? "Pending" :
-                             booking.status === "accepted" ? "Jalan" :
-                             booking.status === "completed" ? "Selesai" : "Batal"}
+                            {booking.status === "pending" ? "Menunggu" :
+                             booking.status === "accepted" ? "Kurir Meluncur" :
+                             booking.status === "completed" ? "Selesai" : "Dibatalkan"}
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-150/50">
                           <div>
-                            <span className="block text-[8px] uppercase font-bold text-slate-400 font-mono">Penjemputan</span>
-                            <span className="text-slate-800 font-medium line-clamp-1">{booking.pickupLocation}</span>
+                            <span className="block text-[8px] uppercase font-bold text-slate-400 font-mono tracking-wider mb-0.5">Titik Jemput (Kos Mahasiswa)</span>
+                            <span className="text-slate-800 font-extrabold flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-indigo-600" /> {booking.pickupLocation}</span>
                           </div>
                           <div>
-                            <span className="block text-[8px] uppercase font-bold text-slate-400 font-mono">Tujuan</span>
-                            <span className="text-slate-800 font-medium line-clamp-1">{booking.destination} ({booking.campusName})</span>
+                            <span className="block text-[8px] uppercase font-bold text-slate-400 font-mono tracking-wider mb-0.5">Tujuan Fakultas ({booking.campusName})</span>
+                            <span className="text-slate-800 font-extrabold flex items-center gap-1"><School className="h-3.5 w-3.5 text-indigo-605" /> {booking.destination}</span>
                           </div>
                         </div>
 
                         {booking.notes && (
-                          <p className="text-[10px] text-slate-500 italic bg-white p-2 rounded border border-slate-100">
-                            Catatan: {booking.notes}
-                          </p>
+                          <div className="text-[10px] text-slate-500 italic bg-white p-3 rounded-xl border border-slate-100">
+                            Catatan Mahasiswa: {booking.notes}
+                          </div>
                         )}
 
-                        <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-                          <span className="text-xs font-bold text-slate-700">Biaya: <span className="text-indigo-600 font-mono font-bold">Rp {booking.price.toLocaleString("id")}</span></span>
+                        {/* Live GPS simulated track for Driver */}
+                        {(booking.status === "accepted" || booking.status === "pending") && (
+                          <div className="bg-white p-3 border border-slate-100 rounded-xl space-y-1">
+                            <span className="block text-[8px] uppercase font-bold text-indigo-650 font-mono tracking-wider">NAVIGASI PERJALANAN MAHASISWA (SIMULASI GPS)</span>
+                            <LiveGpsTracker booking={booking} />
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between border-t border-slate-150 pt-3">
+                          <div>
+                            <span className="text-[9px] text-slate-400 block font-mono">Tarif Pembayaran</span>
+                            <span className="text-sm font-black text-indigo-700 font-mono">Rp {booking.price.toLocaleString("id")}</span>
+                          </div>
+
                           <div className="flex items-center space-x-2">
                             {booking.status === "pending" && (
                               <>
                                 <button
                                   onClick={() => handleSimulateStatus(booking.id, "accepted")}
-                                  className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-bold uppercase cursor-pointer"
+                                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold uppercase cursor-pointer transition shadow-sm"
                                 >
-                                  Terima
+                                  Terima Order
                                 </button>
                                 <button
                                   onClick={() => handleSimulateStatus(booking.id, "cancelled")}
-                                  className="px-2.5 py-1 bg-slate-200 hover:bg-red-50 hover:text-red-600 text-slate-700 rounded text-[10px] font-bold uppercase cursor-pointer"
+                                  className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[10px] font-bold uppercase cursor-pointer transition"
                                 >
                                   Tolak
                                 </button>
@@ -821,15 +1171,15 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
                             {booking.status === "accepted" && (
                               <button
                                 onClick={() => handleSimulateStatus(booking.id, "completed")}
-                                className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-bold uppercase cursor-pointer"
+                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold uppercase cursor-pointer transition shadow-md shadow-indigo-600/10"
                               >
-                                Selesaikan Trip
+                                Selesaikan Perjalanan
                               </button>
                             )}
 
                             {booking.status === "completed" && (
-                              <span className="text-[9px] text-teal-600 font-bold flex items-center bg-teal-50 px-2 py-0.5 rounded">
-                                <CheckCircle className="h-3 w-3 mr-1" /> Trip Selesai
+                              <span className="text-[10px] text-emerald-600 font-extrabold flex items-center bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl">
+                                <CheckCircle className="h-3.5 w-3.5 mr-1 text-emerald-500" /> Selesai Diantar
                               </span>
                             )}
                           </div>
@@ -840,286 +1190,399 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
                 )}
               </div>
 
-              {/* Box 2: Simulator Information Station */}
-              <div className="bg-indigo-950 text-white rounded-2xl p-6 space-y-4 relative overflow-hidden" id="simulation-info-station">
-                <div className="absolute right-0 top-0 w-32 h-32 bg-indigo-700/15 rounded-full blur-3xl"></div>
-                <h3 className="font-extrabold text-sm tracking-tight flex items-center uppercase font-mono text-indigo-300">
-                  <UserCheck className="h-4 w-4 text-indigo-400 mr-2" /> Stasiun Simulasi Pengujian
-                </h3>
-
-                <div className="space-y-3 text-xs text-slate-300 leading-relaxed">
-                  <p>
-                    Anda saat ini sedang berada dalam <strong>Mode Simulasi Driver</strong>. UI ini dirancang khusus untuk mendemonstrasikan kapabilitas integrasi real-time Google Firebase.
-                  </p>
-                  <div className="p-3 bg-black/20 border border-white/5 space-y-2 rounded-xl">
-                    <span className="block font-bold text-white text-[10px] uppercase font-mono tracking-wider">Langkah Pengujian Mandiri:</span>
-                    <ol className="list-decimal pl-4 space-y-1 text-slate-300">
-                      <li>Buka tab <strong>Portal Mahasiswa</strong> di pojok kanan atas.</li>
-                      <li>Pilih salah satu driver aktif (termasuk profile Anda jika sudah online).</li>
-                      <li>Kirimkan order baru mengisi formulir booking.</li>
-                      <li>Kembali ke tab <strong>Portal Driver</strong> ini & status pesanan Anda akan terapdate di sini secara instan tanpa reload halaman!</li>
-                      <li>Terima pesanan tersebut dan selesaikan, lalu tinjau kembali pemutakhiran visualnya di dasbor mahasiswa Anda.</li>
-                    </ol>
+              {/* Right Column (4 cols): Reviews Breakdown logs */}
+              <div className="lg:col-span-4 space-y-6">
+                
+                {/* Feedback Log Deck */}
+                <div className="bg-white rounded-3xl p-6 border border-slate-200 space-y-4" id="reviews-summary-deck">
+                  <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+                    <span className="font-extrabold text-xs text-slate-900 uppercase tracking-widest font-mono flex items-center gap-2">
+                      <Star className="h-4.5 w-4.5 text-yellow-500 fill-yellow-500" /> Ulasan Bintang
+                    </span>
+                    <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-lg border border-amber-100">
+                      {driverReviews.length} Ulasan
+                    </span>
                   </div>
+
+                  {driverReviews.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 space-y-2">
+                      <MessageSquare className="h-6 w-6 text-slate-200 mx-auto" />
+                      <p className="text-[10px] font-medium text-slate-500 leading-relaxed">Belum ada ulasan yang ditinggalkan oleh mahasiswa untuk perjalanan Anda.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                      {driverReviews.map((review) => (
+                        <div key={review.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 space-y-1.5 text-xs">
+                          <div className="flex justify-between items-center pb-1 border-b border-slate-100">
+                            <span className="font-bold text-slate-800">{review.studentName}</span>
+                            <div className="flex items-center text-yellow-500">
+                              {Array.from({ length: review.rating }).map((_, rIdx) => (
+                                <Star key={rIdx} className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-slate-500 italic">"{review.comment}"</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div className="pt-4 border-t border-indigo-900 flex justify-between items-center">
-                  <span className="text-[10px] text-indigo-400 font-mono font-medium">Status Node: REAL_TIME_SYNC_ONLINE</span>
-                  <button 
-                    onClick={() => {
-                      setDriverMode(false);
-                    }}
-                    className="px-3 py-1 bg-white text-indigo-950 rounded text-[10px] font-bold uppercase hover:bg-slate-100 transition cursor-pointer"
-                  >
-                    Kembali Ke Sewa
-                  </button>
+                {/* Simulated testing panel instruction */}
+                <div className="bg-slate-900 text-slate-300 rounded-3xl p-6 border border-slate-800 space-y-3 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-600/10 rounded-full blur-2xl"></div>
+                  <h4 className="font-extrabold text-xs uppercase tracking-widest font-mono text-indigo-400 flex items-center gap-2">
+                    <Zap className="h-4 w-4" /> Uji Coba Vercel Ready
+                  </h4>
+                  <p className="text-[11px] leading-relaxed text-slate-400">
+                    Sistem pelayanan real-time ini dibuat agar langsung kompatibel dengan platform cloud Vercel. Database sinkronisasi sepenuhnya dilayani menggunakan Firestore.
+                  </p>
                 </div>
               </div>
             </div>
           </div>
         ) : (
-          /* VIEW 2: PORTAL MAHASISWA (ORDER & HISTORIC TRACKING) */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="student-workspace">
-            {/* COLUMN LEFT: AVAILABLE DRIVERS (8 cols in LG) */}
+          /* ------------------------------------------------------------------- */
+          /* VIEW 2: PORTAL MAHASISWA & RADAR PROXIMITY SEARCH */
+          /* ------------------------------------------------------------------- */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in animate-duration-300" id="student-workspace">
+            
+            {/* COLUMN LEFT (8 cols): Radar Search Engine and Active Drivers */}
             <div className="lg:col-span-8 space-y-6" id="shuttle-showcase">
-              {/* Search & Statistics Filter Widget */}
-              <div className="bg-white rounded-xl p-5 border border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" id="search-bar">
-                <div>
-                  <h3 className="font-extrabold text-slate-900 text-sm uppercase tracking-wider">Eksplor Driver Semarang Terdekat</h3>
-                  <p className="text-xs text-slate-400 mt-1">Pilih armada yang menjangkau kos-kosan dan universitas Anda di Semarang.</p>
-                </div>
+              
+              {/* BRAND NEW: PROXIMITY GPS RADAR SEARCH ENGINE */}
+              <div className="bg-slate-900 rounded-3xl p-6 md:p-8 text-white relative overflow-hidden shadow-xl" id="radar-search-engine">
+                {/* Backdrop radial glow effect */}
+                <div className="absolute right-0 top-0 w-48 h-48 bg-indigo-650/20 rounded-full blur-3xl"></div>
+                <div className="absolute left-1/3 bottom-0 w-32 h-32 bg-fuchsia-600/15 rounded-full blur-3xl"></div>
 
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs font-bold text-slate-500 font-mono">Status Pool:</span>
-                  <span className="px-2.5 py-1 text-xs font-bold bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100 font-mono">
-                    {shuttles.length} Driver Aktif
-                  </span>
+                <div className="relative space-y-6">
+                  <div>
+                    <span className="text-[10px] font-bold text-indigo-450 uppercase tracking-widest font-mono text-indigo-400 flex items-center gap-1.5">
+                      <Compass className="h-4 w-4 text-indigo-450 animate-spin" /> PROXIMITY RADAR MATCH
+                    </span>
+                    <h3 className="text-2xl font-extrabold tracking-tight mt-1">Cari &amp; Hubungkan Driver Terdekat</h3>
+                    <p className="text-xs text-slate-300 mt-1">Gunakan pemindai radar pintar kami untuk merekomendasikan driver terbaik secara otomatis.</p>
+                  </div>
+
+                  <form onSubmit={handlePerformRadarSearch} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-white/5 p-4 rounded-2xl border border-white/10">
+                    <div>
+                      <label className="block text-[8px] uppercase tracking-widest font-extrabold text-slate-400 mb-1.5 font-mono">Posisi Penjemputan Anda</label>
+                      <select 
+                        value={radarPickup} 
+                        onChange={(e) => setRadarPickup(e.target.value)}
+                        className="w-full bg-slate-850 text-white border border-slate-700/80 rounded-xl p-2.5 text-xs font-semibold focus:ring-1 focus:ring-indigo-500"
+                      >
+                        {allAvailableSemarangRegions.map((region) => (
+                          <option className="bg-slate-900" key={region} value={region}>{region}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[8px] uppercase tracking-widest font-extrabold text-slate-400 mb-1.5 font-mono">Tujuan Kampus Utama</label>
+                      <select 
+                        value={radarCampus} 
+                        onChange={(e) => setRadarCampus(e.target.value)}
+                        className="w-full bg-slate-850 text-white border border-slate-700/80 rounded-xl p-2.5 text-xs font-semibold focus:ring-1 focus:ring-indigo-500"
+                      >
+                        {SEMARANG_CAMPUSES.map((c) => (
+                          <option className="bg-slate-900" key={c.id} value={c.name}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isScanning}
+                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs uppercase tracking-widest cursor-pointer transition flex items-center justify-center space-x-1.5"
+                    >
+                      <Zap className="h-4 w-4 text-indigo-200" />
+                      <span>{isScanning ? "Memindai..." : "Pindai Area"}</span>
+                    </button>
+                  </form>
+
+                  {/* SCANNING ACTIVE SCREEN RENDERS */}
+                  {isScanning && (
+                    <div className="py-8 text-center space-y-4 bg-black/25 rounded-2xl border border-white/5 animate-pulse">
+                      <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      <p className="text-xs font-bold font-mono tracking-wider text-slate-300 uppercase">Menjelajahi Jaringan Cloud Semarang...</p>
+                    </div>
+                  )}
+
+                  {/* RADAR MATCH RESULT SUCCESS SCREEN */}
+                  {matchedDriver && !isScanning && (
+                    <div className="p-5 rounded-2xl bg-white text-slate-900 grid grid-cols-1 md:grid-cols-12 gap-4 items-center border border-indigo-200 animate-slide-up" id="radar-success-deck">
+                      
+                      <div className="md:col-span-8 space-y-3">
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2.5 py-0.5 text-[8px] bg-indigo-50 text-indigo-700 border border-indigo-150 font-bold uppercase rounded-full tracking-wider font-mono">Hasil Rekomendasi Terdekat</span>
+                          <span className="font-mono text-[9px] font-extrabold text-emerald-600 uppercase">Match Score: {matchScore}%</span>
+                        </div>
+                        
+                        <div className="flex items-center space-x-3">
+                          <img src={matchedDriver.driverPhoto} alt={matchedDriver.driverName} className="w-11 h-11 rounded-full object-cover shadow border border-slate-100" />
+                          <div>
+                            <h4 className="font-extrabold text-sm text-slate-950 leading-tight">{matchedDriver.driverName}</h4>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{matchedDriver.vehicleType === "Motorcycle" ? "Motor" : "Mobil"} &bull; {matchedDriver.plateNumber}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-4 text-[10px] text-slate-600">
+                          <span>📍 Rute: <strong>{matchedDriver.coverageAreas.join(", ")}</strong></span>
+                          <span>🏢 Sekolah: <strong>{matchedDriver.targetCampuses.join(", ")}</strong></span>
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-4 text-center md:text-right border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-5 space-y-2">
+                        <div>
+                          <span className="text-[8px] text-slate-400 block uppercase font-bold font-mono">Tarif Estimasi</span>
+                          <span className="text-lg font-black text-indigo-600 font-mono">Rp {matchedDriver.basePrice.toLocaleString("id")}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleApplyMatchToBookingForm(matchedDriver)}
+                          className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[10px] uppercase rounded-lg transition tracking-wide cursor-pointer"
+                        >
+                          Gunakan Driver Ini
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {radarError && !isScanning && (
+                    <div className="p-4 rounded-2xl bg-red-950/40 text-red-100 border border-red-900/30 text-center text-xs font-semibold animate-fade-in flex items-center justify-center space-x-2">
+                      <AlertCircle className="h-4.5 w-4.5 text-red-400 flex-shrink-0" />
+                      <span>{radarError}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* GRID OF DRIVERS */}
-              {loadingShuttles ? (
-                <div className="text-center py-12 text-slate-400">
-                  <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-indigo-500" />
-                  <p className="text-xs font-bold">Mencari ketersediaan Anjem di Semarang...</p>
+              {/* standard manual explore drivers list */}
+              <div className="bg-white rounded-3xl p-6 border border-slate-200/80 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-3">
+                  <div>
+                    <h3 className="font-extrabold text-slate-950 text-sm uppercase tracking-wider">Eksplor Driver Aktif Manual</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Atau Anda dapat menyaring driver Semarang mandiri dari daftar offline/online di bawah.</p>
+                  </div>
+                  <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider">
+                    {shuttles.length} Driver Bersiaga
+                  </span>
                 </div>
-              ) : shuttles.length === 0 ? (
-                <div className="bg-white rounded-xl p-8 border border-slate-200 text-center">
-                  <HelpCircle className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-                  <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">Tidak ada armada terdaftar.</p>
-                  <p className="text-xs text-slate-400 mt-1">Daftarkan akun sebagai driver di pojok kanan atas untuk mensimulasikan orderan!</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4" id="drivers-listing">
-                  {shuttles.map((shuttle) => {
-                    const isCurrentUserDriver = shuttle.id === user.uid;
-                    return (
-                      <div 
-                        key={shuttle.id}
-                        className={`bg-white rounded-xl p-5 border shadow-2xs transition duration-300 flex flex-col justify-between relative overflow-hidden ${
-                          selectedShuttle?.id === shuttle.id 
-                            ? "border-indigo-600 ring-2 ring-indigo-600/10" 
-                            : "border-slate-200 hover:border-indigo-300"
-                        }`}
-                        id={`driver-card-${shuttle.id}`}
-                      >
-                        {/* Selected overlay border accent */}
-                        {shuttle.status === "Busy" && (
-                          <div className="absolute top-0 right-0 py-1 px-3 bg-red-50 text-red-700 text-[9px] font-bold rounded-bl-xl border-l border-b border-red-100 uppercase tracking-widest font-mono">
-                            Sedang Melaju
-                          </div>
-                        )}
 
-                        <div>
-                          {/* Photo and Driver Name Header */}
-                          <div className="flex items-center space-x-3 mb-4">
-                            <img 
-                              src={shuttle.driverPhoto} 
-                              alt={shuttle.driverName} 
-                              className="w-11 h-11 rounded-full border border-slate-100 object-cover"
-                            />
-                            <div>
-                              <div className="flex items-center space-x-1.5">
-                                <h4 className="font-extrabold text-slate-955 text-sm leading-tight">{shuttle.driverName}</h4>
-                                {isCurrentUserDriver && (
-                                  <span className="text-[8px] bg-indigo-50 text-indigo-700 font-bold px-1.5 rounded-full uppercase tracking-wider font-mono">Anda</span>
-                                )}
-                              </div>
-                              <div className="flex items-center space-x-1 mt-0.5">
-                                {shuttle.vehicleType === "Motorcycle" ? (
-                                  <Bike className="h-3 w-3 text-slate-400" />
-                                ) : (
-                                  <Car className="h-3 w-3 text-slate-400" />
-                                )}
-                                <span className="text-[9px] text-slate-400 font-mono italic uppercase">{shuttle.plateNumber}</span>
-                              </div>
+                {loadingShuttles ? (
+                  <div className="text-center py-12 text-slate-400 space-y-2">
+                    <RefreshCw className="h-8 w-8 animate-spin mx-auto text-indigo-600" />
+                    <p className="text-xs font-bold leading-normal">Mencari ketersediaan driver antar jemput...</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {shuttles.map((shuttle) => {
+                      const isCurrentUserDriver = shuttle.id === user.uid;
+                      return (
+                        <div 
+                          key={shuttle.id}
+                          className={`bg-white rounded-2xl p-5 border shadow-xs transition duration-300 flex flex-col justify-between relative overflow-hidden ${
+                            selectedShuttle?.id === shuttle.id 
+                              ? "border-indigo-600 ring-4 ring-indigo-100/50" 
+                              : "border-slate-200/80 hover:border-indigo-400 hover:shadow-md"
+                          }`}
+                        >
+                          {shuttle.status === "Busy" && (
+                            <div className="absolute top-0 right-0 py-1 px-3 bg-indigo-50 text-indigo-700 text-[8px] font-bold rounded-bl-xl border-l border-b border-indigo-100 uppercase tracking-widest font-mono animate-pulse">
+                              SEDANG RUNNING
                             </div>
-                          </div>
-
-                          {/* Detail Information Row */}
-                          <div className="space-y-2 text-xs text-slate-600 mb-6">
-                            <div className="flex items-start space-x-1">
-                              <MapPin className="h-3.5 w-3.5 text-slate-400 mt-0.5 flex-shrink-0" />
-                              <span className="line-clamp-2"><strong>Rute Keberangkatan:</strong> {shuttle.coverageAreas.join(", ")}</span>
-                            </div>
-
-                            <div className="flex items-start space-x-1">
-                              <School className="h-3.5 w-3.5 text-slate-400 mt-0.5 flex-shrink-0" />
-                              <span className="line-clamp-2"><strong>Kampus Tujuan:</strong> {shuttle.targetCampuses.join(", ")}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Bottom action pricing block */}
-                        <div className="border-t border-slate-100 pt-3 mt-auto flex items-center justify-between" id="shuttle-card-footer">
-                          <div>
-                            <span className="block text-[8px] uppercase font-bold text-slate-400 font-mono">Tarif Mulai</span>
-                            <span className="text-base font-black text-indigo-600 font-mono">Rp {shuttle.basePrice.toLocaleString("id")}</span>
-                          </div>
-
-                          {shuttle.status === "Available" ? (
-                            <button
-                              onClick={() => {
-                                if (isCurrentUserDriver) {
-                                  alert("Anda tidak bisa memesan jasa anjem Anda sendiri. Silakan beralih ke Portal Driver atau buat akun pengujian terpisah jika diperlukan.");
-                                  return;
-                                }
-                                setSelectedShuttle(shuttle);
-                                setPickup("");
-                                setDestination("");
-                              }}
-                              className={`px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg cursor-pointer transition ${
-                                selectedShuttle?.id === shuttle.id 
-                                  ? "bg-slate-900 text-white" 
-                                  : "bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-150"
-                              }`}
-                            >
-                              {selectedShuttle?.id === shuttle.id ? "Terpilih" : "Sewa Anjem"}
-                            </button>
-                          ) : (
-                            <span className="px-2.5 py-1 bg-slate-150 text-slate-500 font-bold text-[8px] uppercase tracking-wider font-mono rounded">
-                              Sibuk / Offline
-                            </span>
                           )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
 
-              {/* BOOKING TRACKER STATION */}
-              <div className="bg-white rounded-xl p-6 border border-slate-200 space-y-4" id="booking-tracker">
+                          <div>
+                            <div className="flex items-center space-x-3 mb-4">
+                              <img src={shuttle.driverPhoto} alt={shuttle.driverName} className="w-10 h-10 rounded-full border object-cover shadow-sm bg-slate-100" />
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <h4 className="font-extrabold text-sm text-slate-950 truncate leading-none">{shuttle.driverName}</h4>
+                                  {isCurrentUserDriver && <span className="bg-indigo-50 border border-indigo-100 text-[8px] font-bold text-indigo-700 uppercase tracking-widest px-1 py-0.5 rounded">You</span>}
+                                </div>
+                                <span className="text-[9px] text-slate-450 mt-1 block uppercase font-mono">{shuttle.plateNumber}</span>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5 text-xs text-slate-600 mt-2">
+                              <p className="flex items-start gap-1.5"><MapPin className="h-4 w-4 text-indigo-600 flex-shrink-0" /> <span>Rute: <strong>{shuttle.coverageAreas.join(", ")}</strong></span></p>
+                              <p className="flex items-start gap-1.5"><School className="h-4 w-4 text-indigo-605 flex-shrink-0" /> <span>Kampus: <strong>{shuttle.targetCampuses.join(", ")}</strong></span></p>
+                            </div>
+                          </div>
+
+                          <div className="border-t border-slate-100 pt-3 mt-6 flex items-center justify-between">
+                            <div>
+                              <span className="text-[8px] uppercase tracking-widest font-bold text-slate-400 font-mono">Biaya Mulai</span>
+                              <span className="text-base font-black text-indigo-650 font-mono">Rp {shuttle.basePrice.toLocaleString("id")}</span>
+                            </div>
+
+                            {shuttle.status === "Available" ? (
+                              <div className="flex items-center space-x-1.5">
+                                <a
+                                  href={`https://wa.me/${
+                                    shuttle.whatsapp.replace(/\D/g, "").startsWith("0") 
+                                      ? "62" + shuttle.whatsapp.replace(/\D/g, "").slice(1) 
+                                      : shuttle.whatsapp.replace(/\D/g, "") || "628"
+                                  }?text=${encodeURIComponent(`Halo Kak ${shuttle.driverName}! Saya berminat memesan layanan ANJEM SESHH Anda di Semarang. Apakah sedang available untuk mengantar saya sekarang?`)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl font-bold border border-emerald-200 text-[10px] uppercase transition flex items-center space-x-1"
+                                >
+                                  <span>Chat WA</span>
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (isCurrentUserDriver) {
+                                      triggerCustomAlert("Anda tidak bisa memesan jasa anjem Anda pribadi. Silakan buat akun testing mahasiswa atau sewa driver lain.");
+                                      return;
+                                    }
+                                    setSelectedShuttle(shuttle);
+                                  }}
+                                  className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-xl transition ${
+                                    selectedShuttle?.id === shuttle.id 
+                                      ? "bg-slate-900 text-white" 
+                                      : "bg-indigo-50 border border-indigo-100 text-indigo-805 hover:bg-indigo-100"
+                                  }`}
+                                >
+                                  {selectedShuttle?.id === shuttle.id ? "Terpilih" : "Booking"}
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="px-3 py-1 bg-slate-100 text-slate-400 text-[9px] font-bold font-mono rounded">SIBUK / OFFLINE</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* RIWAYAT RIDE TRACKING MODULE */}
+              <div className="bg-white rounded-3xl p-6 border border-slate-205 space-y-4" id="booking-tracker">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center space-x-2">
-                    <ClipboardList className="h-5 w-5 text-indigo-600" />
-                    <h3 className="font-extrabold text-slate-900 text-sm uppercase tracking-wider">Riwayat Perjalanan Anda</h3>
+                    <ClipboardList className="h-5 w-5 text-indigo-650" />
+                    <h3 className="font-extrabold text-slate-950 text-xs uppercase tracking-wider font-mono">Log Riwayat Perjalanan</h3>
                   </div>
-                  <span className="text-[10px] bg-slate-100 text-slate-750 px-2.5 py-0.5 rounded-full font-mono font-bold">
-                    {myBookings.length} Total
+                  <span className="text-[10px] uppercase font-bold bg-slate-100 text-slate-700 px-3 py-1 rounded-xl">
+                    {myBookings.length} Log Total
                   </span>
                 </div>
 
                 {loadingBookings ? (
                   <div className="text-center py-6 text-slate-400">
-                    <RefreshCw className="h-5 w-5 animate-spin mx-auto mr-2 text-indigo-505" /> Meninjau berkas booking...
+                    <RefreshCw className="h-6 w-6 animate-spin mx-auto text-indigo-600 mb-1" /> Memuat data...
                   </div>
                 ) : myBookings.length === 0 ? (
-                  <div className="text-center py-12 text-slate-400 space-y-2">
-                    <HelpCircle className="h-7 w-7 text-slate-200 mx-auto" />
-                    <p className="text-xs font-semibold text-slate-500">Anda belum pernah melakukan pemesanan.</p>
-                    <p className="text-[10px] text-slate-400">Silakan klik tombol "Sewa Anjem" di atas untuk membuat order baru!</p>
+                  <div className="text-center py-16 text-slate-400 space-y-2">
+                    <HelpCircle className="h-9 w-9 text-slate-200 mx-auto" />
+                    <p className="text-xs font-bold text-slate-800">Anda belum pernah membuat reservasi.</p>
+                    <p className="text-[10px] text-slate-400">Silakan sewa salah satu driver Semarang di atas!</p>
                   </div>
                 ) : (
                   <div className="space-y-4" id="bookings-history-list">
                     {myBookings.map((booking) => (
-                      <div 
-                        key={booking.id} 
-                        className="p-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:shadow-xs transition duration-200 space-y-3"
-                      >
-                        <div className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-slate-100">
+                      <div key={booking.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-white hover:shadow-md transition duration-300 space-y-3">
+                        <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100">
                           <div>
-                            <span className="block text-xs font-bold text-slate-900">{booking.driverName}</span>
-                            <span className="block text-[8px] text-slate-400 font-mono">ID Booking: {booking.id}</span>
+                            <span className="block text-xs font-black text-slate-900">Kos &rarr; {booking.driverName}</span>
+                            <span className="text-[8px] font-mono block text-slate-400">Booking ID: {booking.id}</span>
                           </div>
-
-                          <div className="flex items-center space-x-2">
-                            <span className={`px-2 py-0.5 text-[9px] font-bold rounded uppercase ${
-                              booking.status === "pending" ? "bg-amber-50 text-amber-800 border border-amber-200" :
-                              booking.status === "accepted" ? "bg-indigo-50 text-indigo-800 border border-indigo-200 animate-pulse" :
-                              booking.status === "completed" ? "bg-teal-50 text-teal-850 border border-teal-200" :
-                              "bg-slate-200 text-slate-700"
-                            }`}>
-                              {booking.status === "pending" ? "Menunggu" :
-                               booking.status === "accepted" ? "Menjemput" :
-                               booking.status === "completed" ? "Selesai" : "Batal"}
-                            </span>
-                          </div>
+                          <span className={`px-2.5 py-0.5 text-[8px] font-bold rounded-lg uppercase tracking-wider ${
+                            booking.status === "pending" ? "bg-amber-55 text-amber-800 border border-amber-200 bg-amber-50" :
+                            booking.status === "accepted" ? "bg-indigo-50 text-indigo-800 border border-indigo-200 animate-pulse" :
+                            booking.status === "completed" ? "bg-emerald-50 text-emerald-800 border border-emerald-200" :
+                            "bg-slate-200 text-slate-600"
+                          }`}>
+                            {booking.status === "pending" ? "Diproses" :
+                             booking.status === "accepted" ? "Kurir Berangkat" :
+                             booking.status === "completed" ? "Udah Sampai" : "Batal"}
+                          </span>
                         </div>
 
-                        {/* Interactive simulation visual progress bar */}
                         {booking.status !== "cancelled" && (
-                          <div className="space-y-1">
-                            <div className="w-full bg-slate-200 rounded-full h-1 overflow-hidden">
-                              <div 
-                                className={`h-full transition-all duration-500 ${
-                                  booking.status === "pending" ? "w-1/3 bg-amber-500" :
-                                  booking.status === "accepted" ? "w-2/3 bg-indigo-600" :
-                                  "w-full bg-teal-500"
-                                }`}
-                              ></div>
+                          <div className="space-y-3 bg-white p-2.5 rounded-xl border border-slate-100">
+                            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                              <div className={`h-full transition-all duration-500 bg-indigo-650 ${
+                                booking.status === "pending" ? "w-1/3" :
+                                booking.status === "accepted" ? "w-2/3" : "w-full"
+                              }`}></div>
                             </div>
-                            <div className="flex justify-between text-[8px] font-bold tracking-wider text-slate-400 uppercase font-mono px-0.5">
-                              <span className={booking.status === "pending" ? "text-amber-600" : ""}>Booked</span>
-                              <span className={booking.status === "accepted" ? "text-indigo-600" : ""}>Jalan</span>
-                              <span className={booking.status === "completed" ? "text-teal-600" : ""}>Selesai</span>
+                            <div className="flex justify-between text-[8px] font-mono font-bold tracking-wider text-slate-450 uppercase px-0.5">
+                              <span className={booking.status === 'pending' ? 'text-amber-600' : ''}>Pemesanan</span>
+                              <span className={booking.status === 'accepted' ? 'text-indigo-600' : ''}>Di Jalan</span>
+                              <span className={booking.status === 'completed' ? 'text-emerald-600' : ''}>Selesai</span>
                             </div>
+
+                            {/* Live GPS simulated track */}
+                            {(booking.status === "accepted" || booking.status === "pending") && (
+                              <LiveGpsTracker booking={booking} />
+                            )}
                           </div>
                         )}
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-100">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs bg-white p-3 rounded-xl border border-slate-100 text-slate-650">
                           <div>
-                            <span className="text-slate-400 text-[10px] block font-mono font-bold uppercase">Jalur Jemput</span>
-                            <span className="font-semibold text-slate-800">{booking.pickupLocation}</span>
+                            <span className="text-[8px] uppercase font-mono font-bold text-slate-400 tracking-wider">Antar dari</span>
+                            <span className="text-slate-805 font-bold block">{booking.pickupLocation}</span>
                           </div>
                           <div>
-                            <span className="text-slate-400 text-[10px] block font-mono font-bold uppercase">Tujuan ({booking.campusName})</span>
-                            <span className="font-semibold text-slate-800">{booking.destination}</span>
+                            <span className="text-[8px] uppercase font-mono font-bold text-slate-400 tracking-wider">Ke Gedung ({booking.campusName})</span>
+                            <span className="text-slate-805 font-bold block">{booking.destination}</span>
                           </div>
                         </div>
 
-                        {/* Booking Meta Action Area */}
-                        <div className="flex flex-wrap items-center justify-between border-t border-slate-100 pt-3">
+                        <div className="border-t border-slate-100 pt-3 flex flex-wrap items-center justify-between">
                           <div>
-                            <span className="text-[10px] text-slate-400 block font-mono uppercase">Harga Final</span>
+                            <span className="text-[8px] text-slate-400 block font-mono">Biaya Perjalanan</span>
                             <span className="text-sm font-black text-slate-900 font-mono">Rp {booking.price.toLocaleString("id")}</span>
                           </div>
 
                           <div className="flex items-center space-x-2">
+                            {booking.status !== "cancelled" && (
+                              <a
+                                href={getWhatsAppUrl(
+                                  booking.driverWhatsapp || "628",
+                                  booking.driverName,
+                                  booking.id,
+                                  booking.price,
+                                  booking.pickupLocation,
+                                  booking.destination
+                                )}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-2 bg-emerald-650 hover:bg-emerald-705 text-white font-extrabold rounded-lg text-[9px] uppercase tracking-wider transition flex items-center space-x-1.5 shadow-sm"
+                              >
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                                <span>Hubungi WA</span>
+                              </a>
+                            )}
+
                             {booking.status === "pending" && (
                               <button
                                 onClick={() => handleCancelBooking(booking)}
-                                className="px-3 py-1 bg-white hover:bg-slate-100 text-red-500 font-bold border border-slate-200 rounded-lg text-[10px] uppercase cursor-pointer transition"
+                                className="px-3 py-2 bg-white hover:bg-slate-100 text-red-500 font-bold border border-slate-205 rounded-lg text-[9px] uppercase transition"
                               >
-                                Batalkan Order
+                                Batal
                               </button>
                             )}
 
                             {booking.status === "completed" && (
                               <button
                                 onClick={() => setReviewingBooking(booking)}
-                                className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-[10px] uppercase cursor-pointer flex items-center space-x-1 shadow-sm transition"
+                                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-750 text-white font-bold rounded-lg text-[9px] uppercase transition flex items-center space-x-1 shadow-sm"
                               >
                                 <Star className="h-3 w-3 fill-white text-white" />
-                                <span>Beri Ulasan</span>
+                                <span>Ulas</span>
                               </button>
-                            )}
-
-                            {/* Simulation station inline helper to let student test their own order */}
-                            {booking.status === "pending" && (
-                              <div className="bg-amber-50 text-amber-900 px-3 py-1 text-[9px] font-medium leading-tight rounded border border-amber-100 max-w-xs text-center">
-                                *Gunakan beralih ke <strong>Portal Driver</strong> di atas untuk simulasi real-time update.
-                              </div>
                             )}
                           </div>
                         </div>
@@ -1130,127 +1593,135 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
               </div>
             </div>
 
-            {/* COLUMN RIGHT: ORDER PANEL (4 cols in LG) */}
+            {/* COLUMN RIGHT (4 cols): STICKY ORDER FORM */}
             <div className="lg:col-span-4" id="order-panel">
-              <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-6 sticky top-20" id="sticky-order-box">
+              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xl space-y-6 sticky top-24" id="sticky-order-box">
                 <div>
-                  <h3 className="font-extrabold text-slate-950 text-sm uppercase tracking-wider">Form Sewa Anjem</h3>
-                  <p className="text-xs text-slate-400 mt-1">Pesan langsung sewa driver Semarang tepercaya di bawah.</p>
+                  <h3 className="font-extrabold text-slate-950 text-xs uppercase tracking-widest font-mono text-slate-500">Form Pemesanan Jasa</h3>
+                  <h4 className="text-lg font-black text-slate-905 mt-0.5">Konfirmasi Rute Anda</h4>
                 </div>
 
                 {bookingSuccess && (
-                  <div className="p-3 bg-indigo-50 text-indigo-800 rounded-lg text-xs space-y-1 border border-indigo-100 animate-fade-in font-medium" id="success-alert">
-                    <span className="font-bold block">Pemesanan Terkirim!</span>
+                  <div className="p-3 bg-indigo-50 text-indigo-850 rounded-xl text-xs space-y-1 border border-indigo-100 font-semibold" id="success-alert">
+                    <span className="font-bold block text-indigo-805">Pemesanan Sukses!</span>
                     <p>{bookingSuccess}</p>
+                    <button 
+                      onClick={() => setBookingSuccess(null)}
+                      className="text-[9px] uppercase underline mt-1 text-indigo-600 cursor-pointer block"
+                    >
+                      Tutup
+                    </button>
                   </div>
                 )}
 
                 {bookingError && (
-                  <div className="p-3 bg-red-50 text-red-800 rounded-lg text-xs font-medium border border-red-100" id="error-alert">
+                  <div className="p-3 bg-red-50 text-red-800 rounded-xl text-xs border border-red-100 font-medium" id="error-alert">
                     {bookingError}
                   </div>
                 )}
 
                 {selectedShuttle ? (
                   <form onSubmit={handleCreateBooking} className="space-y-4">
-                    {/* Tiny Driver badge inside form */}
-                    <div className="p-3 bg-indigo-50/40 rounded-xl border border-indigo-100 flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <img 
-                          src={selectedShuttle.driverPhoto} 
-                          alt={selectedShuttle.driverName} 
-                          className="w-8 h-8 rounded-full border border-slate-150"
-                        />
+                    
+                    {/* Compact matched driver preview banner */}
+                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <img src={selectedShuttle.driverPhoto} alt={selectedShuttle.driverName} className="w-9 h-9 rounded-full object-cover" />
                         <div>
-                          <span className="block font-bold text-xs text-slate-900">{selectedShuttle.driverName}</span>
-                          <span className="block text-[8px] text-indigo-700 uppercase font-bold font-mono">{selectedShuttle.vehicleType === "Motorcycle" ? "Motor" : "Mobil"} &bull; {selectedShuttle.plateNumber}</span>
+                          <p className="font-black text-xs text-slate-950">{selectedShuttle.driverName}</p>
+                          <span className="text-[8px] text-indigo-700 font-bold uppercase font-mono">{selectedShuttle.plateNumber} &bull; {selectedShuttle.vehicleType === 'Motorcycle' ? 'Motor' : 'Mobil'}</span>
                         </div>
                       </div>
                       <button 
                         type="button" 
                         onClick={() => setSelectedShuttle(null)}
-                        className="p-1 hover:bg-indigo-100 text-indigo-800 rounded-lg cursor-pointer"
+                        className="p-1.5 bg-slate-100 hover:bg-slate-250 rounded-xl transition"
                       >
-                        <X className="h-4 w-4" />
+                        <X className="h-4.5 w-4.5 text-slate-500" />
                       </button>
                     </div>
 
                     <div>
-                      <label className="block text-[10px] uppercase font-bold text-slate-700 tracking-wider mb-1">Hubungi Chat WhatsApp</label>
-                      <div className="flex items-center space-x-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                        <Phone className="h-3.5 w-3.5 text-indigo-600 animate-pulse" />
-                        <span className="text-xs font-mono font-semibold text-slate-700">+{selectedShuttle.whatsapp}</span>
-                      </div>
+                      <label className="block text-[9px] uppercase tracking-widest font-extrabold text-slate-500 mb-1">WhatsApp Hubungi Driver</label>
+                      <a 
+                        href={`https://wa.me/${selectedShuttle.whatsapp}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center space-x-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-indigo-705 font-mono font-bold hover:bg-slate-100 transition"
+                      >
+                        <Phone className="h-4 w-4 text-emerald-500 fill-emerald-500 animate-pulse" />
+                        <span>Chat WhatsApp: +{selectedShuttle.whatsapp}</span>
+                      </a>
                     </div>
 
                     <div>
-                      <label className="block text-[10px] uppercase font-bold text-slate-700 tracking-wider mb-1">Titik Jemput (Alamat/Kos) *</label>
+                      <label className="block text-[9px] uppercase tracking-widest font-extrabold text-slate-500 mb-1">Titik Jemput (Kos / Jargon Semarang) *</label>
                       <input
                         type="text"
                         required
-                        placeholder="Contoh: Gang Gayamsari V, Tembalang (Kos Elok)"
+                        placeholder="Contoh: Gang Sirojudin No 12, Tembalang"
                         value={pickup}
                         onChange={(e) => setPickup(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                        className="w-full bg-slate-50 border border-slate-205 rounded-xl p-3 text-xs focus:ring-1 focus:ring-indigo-500 focus:bg-white focus:outline-none font-semibold text-slate-900 placeholder:text-slate-400"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[10px] uppercase font-bold text-slate-700 tracking-wider mb-1">Gedung / Fakultas Tujuan *</label>
+                      <label className="block text-[9px] uppercase tracking-widest font-extrabold text-slate-500 mb-1">Tujuan / Gedung Fakultas *</label>
                       <input
                         type="text"
                         required
-                        placeholder="Contoh: Dekanat Ilmu Sosial FISIP"
+                        placeholder="Contoh: Gedung ICT / Widya Puraya"
                         value={destination}
                         onChange={(e) => setDestination(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                        className="w-full bg-slate-50 border border-slate-205 rounded-xl p-3 text-xs focus:ring-1 focus:ring-indigo-500 focus:bg-white focus:outline-none font-semibold text-slate-900 placeholder:text-slate-400"
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-[10px] uppercase font-bold text-slate-700 tracking-wider mb-1">Universitas *</label>
+                        <label className="block text-[9px] uppercase tracking-widest font-extrabold text-slate-500 mb-1">Universitas *</label>
                         <select
                           value={selectedCampus}
                           onChange={(e) => setSelectedCampus(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                          className="w-full bg-slate-50 border border-slate-205 rounded-xl p-2.5 text-xs font-semibold focus:outline-none focus:ring-1 text-slate-900"
                         >
-                          {SEMARANG_CAMPUSES.map(c => (
-                            <option key={c.id} value={c.name}>{c.name}</option>
+                          {SEMARANG_CAMPUSES.map((c) => (
+                            <option key={c.id} value={c.name} className="text-slate-900">{c.name}</option>
                           ))}
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[10px] uppercase font-bold text-slate-700 tracking-wider mb-1">No. Telp Aktif *</label>
+                        <label className="block text-[9px] uppercase tracking-widest font-extrabold text-slate-500 mb-1">Kontak Anda *</label>
                         <input
                           type="text"
                           required
-                          placeholder="081xxxxx"
+                          placeholder="0813xxxxxxxx"
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                          className="w-full bg-slate-50 border border-slate-205 rounded-xl p-2.5 text-xs focus:ring-1 text-slate-900 placeholder:text-slate-400"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-[10px] uppercase font-bold text-slate-700 tracking-wider mb-1">Catatan Tambahan (Opsional)</label>
+                      <label className="block text-[9px] uppercase tracking-widest font-extrabold text-slate-500 mb-1">Rincian Catatan (Opsional)</label>
                       <input
                         type="text"
                         placeholder="Bawa helm ganda / jas hujan"
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                        className="w-full bg-slate-50 border border-slate-205 rounded-xl p-3 text-xs text-slate-900 placeholder:text-slate-400"
                       />
                     </div>
 
-                    {/* Cost Computation */}
-                    <div className="bg-slate-100 p-3 rounded-xl border border-slate-200/60 flex justify-between items-center text-xs">
+                    {/* Fare Summary billing block */}
+                    <div className="bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100 flex items-center justify-between text-xs font-semibold">
                       <div>
-                        <span className="block text-[8px] text-slate-400 font-bold uppercase font-mono">Estimasi Biaya</span>
-                        <span className="text-slate-800 font-bold text-[11px] leading-tight line-clamp-1">{selectedShuttle.driverName}</span>
+                        <span className="block text-[8px] tracking-wider uppercase font-mono text-slate-400">Total Tarif</span>
+                        <span className="text-indigo-805 truncate line-clamp-1">Sewa {selectedShuttle.driverName}</span>
                       </div>
-                      <span className="text-sm font-black text-indigo-700 font-mono">
+                      <span className="text-base font-black font-mono text-indigo-700">
                         Rp {(selectedShuttle.basePrice + (selectedCampus !== selectedShuttle.targetCampuses[0] ? 3000 : 0)).toLocaleString("id")}
                       </span>
                     </div>
@@ -1258,18 +1729,18 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
                     <button
                       type="submit"
                       disabled={submittingBooking}
-                      className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-xs uppercase tracking-widest transition cursor-pointer flex items-center justify-center space-x-1"
+                      className="w-full py-3.5 bg-slate-900 hover:bg-indigo-650 text-white font-extrabold rounded-xl text-xs uppercase tracking-widest transition duration-300 flex items-center justify-center space-x-1.5 cursor-pointer shadow-lg"
                     >
-                      <Send className="h-3.5 w-3.5 text-indigo-400" />
-                      <span>{submittingBooking ? "Proses..." : "Kirim Order"}</span>
+                      <Send className="h-4 w-4 text-indigo-300" />
+                      <span>{submittingBooking ? "Mengirim..." : "Kirim Reservasi"}</span>
                     </button>
                   </form>
                 ) : (
-                  <div className="text-center py-16 text-slate-400 space-y-3" id="blank-form-display">
-                    <Bike className="h-9 w-9 text-slate-200 mx-auto animate-pulse" />
-                    <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">Form Terkunci</p>
-                    <p className="text-[11px] text-slate-400 max-w-xs mx-auto leading-relaxed">
-                      Silakan pilih salah satu armada yang tersedia di daftar sebelah kiri terlebih dahulu untuk memulai pengisian.
+                  <div className="text-center py-20 text-slate-400 space-y-3 bg-slate-50 rounded-3xl border border-slate-200/80" id="blank-form-display">
+                    <Bike className="h-10 w-10 text-slate-350 mx-auto animate-bounce" />
+                    <p className="text-xs font-extrabold text-slate-900 uppercase tracking-widest font-mono">Form Sewa Terkunci</p>
+                    <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed px-4">
+                      Silakan gunakan <strong>Radar Proximity</strong> di atas untuk pencarian otomatis driver terdekat, atau klik <strong>Sewa Sekarang</strong> manual pada kartu driver pilihan Anda.
                     </p>
                   </div>
                 )}

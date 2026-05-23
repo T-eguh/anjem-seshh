@@ -25,6 +25,7 @@ export interface Booking {
   studentPhone: string;
   shuttleId: string;
   driverName: string;
+  driverWhatsapp?: string;
   pickupLocation: string;
   destination: string;
   campusName: string;

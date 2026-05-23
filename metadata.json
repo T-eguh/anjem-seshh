@@ -1,6 +1,6 @@
 {
-  "name": "Anjem Semarang",
-  "description": "Sistem Informasi Pelayanan Antar Jemput (Anjem) Mahasiswa di Semarang dengan navigasi, dashboard, dan integrasi real-time.",
+  "name": "ANJEM SESHH",
+  "description": "Sistem Informasi Transportasi Antar Jemput (Anjem Seshh) Mahasiswa Terpadu di Kota Semarang dengan Pencari Lokasi, Tarif Transparan, Integrasi WhatsApp Direct, dan Sistem Real-time Firestore.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
