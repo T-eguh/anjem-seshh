@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "shuttle": {
+      "title": "Shuttle Service / Driver",
+      "description": "Represents an active shuttle driver or service in the Semarang area.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "driverName": { "type": "string" },
+        "driverPhoto": { "type": "string" },
+        "vehicleType": { "type": "string", "enum": ["Motorcycle", "Car"] },
+        "plateNumber": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "coverageAreas": { "type": "array" },
+        "targetCampuses": { "type": "array" },
+        "basePrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["Available", "Busy", "Offline"] },
+        "rating": { "type": "number" },
+        "totalTrips": { "type": "number" }
+      },
+      "required": ["id", "driverName", "vehicleType", "plateNumber", "whatsapp", "coverageAreas", "targetCampuses", "basePrice", "status", "rating"]
+    },
+    "booking": {
+      "title": "Shuttle Booking",
+      "description": "Represents a real-time ride booking made by a student.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentUid": { "type": "string" },
+        "studentName": { "type": "string" },
+        "studentEmail": { "type": "string" },
+        "studentPhone": { "type": "string" },
+        "shuttleId": { "type": "string" },
+        "driverName": { "type": "string" },
+        "pickupLocation": { "type": "string" },
+        "destination": { "type": "string" },
+        "campusName": { "type": "string" },
+        "price": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "completed", "cancelled"] },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "studentUid", "studentName", "studentEmail", "studentPhone", "shuttleId", "driverName", "pickupLocation", "destination", "campusName", "price", "status", "createdAt", "updatedAt"]
+    },
+    "review": {
+      "title": "Driver Review",
+      "description": "Feedback and rating provided by a student after a completed trip.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "bookingId": { "type": "string" },
+        "shuttleId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "bookingId", "shuttleId", "studentName", "rating", "comment", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/shuttles/{shuttleId}": {
+      "schema": "shuttle",
+      "description": "Collection of active shuttle services in Semarang."
+    },
+    "/bookings/{bookingId}": {
+      "schema": "booking",
+      "description": "Collection of real-time student ride bookings."
+    },
+    "/reviews/{reviewId}": {
+      "schema": "review",
+      "description": "Collection of ratings and review comments for drivers."
+    }
+  }
+}

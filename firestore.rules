@@ -1,0 +1,127 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. Global Catch-All Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    // --- Reusable global helper functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Shuttles Validation and Rules ---
+    function isValidShuttle(shuttle) {
+      return shuttle.id is string && shuttle.id.size() <= 128
+        && shuttle.driverName is string && shuttle.driverName.size() <= 100
+        && shuttle.vehicleType in ['Motorcycle', 'Car']
+        && shuttle.plateNumber is string && shuttle.plateNumber.size() <= 20
+        && shuttle.whatsapp is string && shuttle.whatsapp.size() <= 20
+        && shuttle.coverageAreas is list
+        && shuttle.targetCampuses is list
+        && shuttle.basePrice is number && shuttle.basePrice >= 0
+        && shuttle.status in ['Available', 'Busy', 'Offline']
+        && shuttle.rating is number && shuttle.rating >= 0 && shuttle.rating <= 5
+        && shuttle.totalTrips is number && shuttle.totalTrips >= 0;
+    }
+    
+    match /shuttles/{shuttleId} {
+      allow read: if isSignedIn();
+      
+      allow create: if isSignedIn() 
+        && isValidId(shuttleId) 
+        && shuttleId == request.auth.uid 
+        && isValidShuttle(incoming());
+        
+      allow update: if isSignedIn() 
+        && isValidId(shuttleId) 
+        && shuttleId == request.auth.uid 
+        && isValidShuttle(incoming())
+        && incoming().id == existing().id;
+        
+      allow delete: if isSignedIn() 
+        && shuttleId == request.auth.uid;
+    }
+    
+    // --- Bookings Validation and Rules ---
+    function isValidBooking(booking) {
+      return booking.id is string && booking.id.size() <= 128
+        && booking.studentUid is string && booking.studentUid.size() <= 128
+        && booking.studentName is string && booking.studentName.size() <= 100
+        && booking.studentEmail is string && booking.studentEmail.size() <= 100
+        && booking.studentPhone is string && booking.studentPhone.size() <= 20
+        && booking.shuttleId is string && booking.shuttleId.size() <= 128
+        && booking.driverName is string && booking.driverName.size() <= 100
+        && booking.pickupLocation is string && booking.pickupLocation.size() <= 300
+        && booking.destination is string && booking.destination.size() <= 300
+        && booking.campusName is string && booking.campusName.size() <= 100
+        && booking.price is number && booking.price >= 0
+        && booking.status in ['pending', 'accepted', 'completed', 'cancelled']
+        && (!('notes' in booking) || booking.notes is string);
+    }
+    
+    match /bookings/{bookingId} {
+      // Students can read their own bookings. Drivers of the shuttle can read their assigned bookings.
+      allow read: if isSignedIn() && (
+        resource.data.studentUid == request.auth.uid || 
+        resource.data.shuttleId == request.auth.uid
+      );
+      
+      allow create: if isSignedIn() 
+        && isValidId(bookingId) 
+        && isValidBooking(incoming()) 
+        && incoming().studentUid == request.auth.uid
+        && incoming().createdAt == request.time;
+        
+      allow update: if isSignedIn() 
+        && isValidId(bookingId) 
+        && isValidBooking(incoming())
+        && (existing().studentUid == request.auth.uid || existing().shuttleId == request.auth.uid)
+        // Ensure immutable values do not change
+        && incoming().id == existing().id
+        && incoming().studentUid == existing().studentUid
+        && incoming().shuttleId == existing().shuttleId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+        
+      allow delete: if isSignedIn() 
+        && resource.data.studentUid == request.auth.uid 
+        && resource.data.status == 'cancelled';
+    }
+    
+    // --- Reviews Validation and Rules ---
+    function isValidReview(review) {
+      return review.id is string && review.id.size() <= 128
+        && review.bookingId is string && review.bookingId.size() <= 128
+        && review.shuttleId is string && review.shuttleId.size() <= 128
+        && review.studentName is string && review.studentName.size() <= 100
+        && review.rating is number && review.rating >= 1 && review.rating <= 5
+        && review.comment is string && review.comment.size() <= 1000;
+    }
+    
+    match /reviews/{reviewId} {
+      allow read: if isSignedIn();
+      
+      // Allow any student to leave a review if they are signed in and reference a valid booking.
+      allow create: if isSignedIn() 
+        && isValidId(reviewId) 
+        && isValidReview(incoming()) 
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/bookings/$(incoming().bookingId));
+    }
+  }
+}

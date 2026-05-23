@@ -1,0 +1,6 @@
+{
+  "name": "Anjem Semarang",
+  "description": "Sistem Informasi Pelayanan Antar Jemput (Anjem) Mahasiswa di Semarang dengan navigasi, dashboard, dan integrasi real-time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
